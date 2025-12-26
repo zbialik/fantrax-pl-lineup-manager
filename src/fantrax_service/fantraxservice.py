@@ -62,6 +62,28 @@ class FantraxService:
         except Exception as e:
             raise FantraxException(f"Error loading cookie file {cookie_path}: {e}")
 
+    def _request(self, method, **kwargs):
+        data = {"leagueId": self.league_id}
+        for key, value in kwargs.items():
+            data[key] = value
+        json_data = {"msgs": [{"method": method, "data": data}]}
+        logger.debug(f"Request JSON: {json_data}")
+
+        try:
+            response = self._session.post("https://www.fantrax.com/fxpa/req", params={"leagueId": self.league_id}, json=json_data)
+            response_json = response.json()
+        except (RequestException, JSONDecodeError) as e:
+            raise FantraxException(f"Failed to Connect to {method}: {e}\nData: {data}")
+        logger.debug(f"Response ({response.status_code} [{response.reason}]) {response_json}")
+        if response.status_code >= 400:
+            raise FantraxException(f"({response.status_code} [{response.reason}]) {response_json}")
+        if "pageError" in response_json:
+            if "code" in response_json["pageError"]:
+                if response_json["pageError"]["code"] == "WARNING_NOT_LOGGED_IN":
+                    raise Unauthorized("Unauthorized: Not Logged in")
+            raise FantraxException(f"Error: {response_json}")
+        return response_json["responses"][0]["data"]
+
     @property
     def teams(self) -> List[Team]:
         if self._teams is None:
@@ -94,31 +116,8 @@ class FantraxService:
                 return team
         raise FantraxException(f"Team ID: {team_id} not found")
 
-    def _request(self, method, **kwargs):
-        data = {"leagueId": self.league_id}
-        for key, value in kwargs.items():
-            data[key] = value
-        json_data = {"msgs": [{"method": method, "data": data}]}
-        logger.debug(f"Request JSON: {json_data}")
-
-        try:
-            response = self._session.post("https://www.fantrax.com/fxpa/req", params={"leagueId": self.league_id}, json=json_data)
-            response_json = response.json()
-        except (RequestException, JSONDecodeError) as e:
-            raise FantraxException(f"Failed to Connect to {method}: {e}\nData: {data}")
-        logger.debug(f"Response ({response.status_code} [{response.reason}]) {response_json}")
-        if response.status_code >= 400:
-            raise FantraxException(f"({response.status_code} [{response.reason}]) {response_json}")
-        if "pageError" in response_json:
-            if "code" in response_json["pageError"]:
-                if response_json["pageError"]["code"] == "WARNING_NOT_LOGGED_IN":
-                    raise Unauthorized("Unauthorized: Not Logged in")
-            raise FantraxException(f"Error: {response_json}")
-        return response_json["responses"][0]["data"]
-
     def roster_info(self):
         return Roster(self, self._request("getTeamRosterInfo", teamId=self.team_id), self.team_id)
-
         
     def make_lineup_changes(self, changes: dict, apply_to_future_periods: bool = True) -> bool:
         """Make lineup changes for a team.
