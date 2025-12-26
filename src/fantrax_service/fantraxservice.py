@@ -36,6 +36,7 @@ class FantraxService:
             self._load_cookies(cookie_path)
         
         self._teams = None
+        self._positions = None
 
     def _load_cookies(self, cookie_path: str) -> None:
         """Load authentication cookies from a pickle file into the session.
@@ -69,6 +70,12 @@ class FantraxService:
             for data in response["fantasyTeams"]:
                 self._teams.append(Team(self, data["id"], data["name"], data["shortName"], data["logoUrl256"]))
         return self._teams
+
+    @property
+    def positions(self) -> Dict[str, Position]:
+        if self._positions is None:
+            self._positions = {k: Position(self, v) for k, v in self._request("getRefObject", type="Position")["allObjs"].items()}
+        return self._positions
 
     def team(self, team_id: str) -> Team:
         """ :class:`~Team` Object for the given Team ID.
@@ -111,6 +118,7 @@ class FantraxService:
 
     def roster_info(self):
         return Roster(self, self._request("getTeamRosterInfo", teamId=self.team_id), self.team_id)
+
         
     def make_lineup_changes(self, changes: dict, apply_to_future_periods: bool = True) -> bool:
         """Make lineup changes for a team.
