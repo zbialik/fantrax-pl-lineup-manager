@@ -1,0 +1,4 @@
+deploy/*.cookie
+deploy/.env
+venv
+__pycache__
