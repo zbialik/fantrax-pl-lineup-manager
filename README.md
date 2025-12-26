@@ -31,5 +31,5 @@ This will create a cookie file that contains your authentication information.
 source deploy/.env # make sure this has 
 
 # Run service
-python src/fantrax_service --league-id ${LEAGUE_ID} --team-id ${TEAM_ID} --cookie-path deploy/fantraxloggedin.cookie
+python -m fantrax_service --league-id ${LEAGUE_ID} --team-id ${TEAM_ID} --cookie-path deploy/fantraxloggedin.cookie
 ```

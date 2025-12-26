@@ -11,7 +11,7 @@ from fantrax_service.objs import Team, Position, Roster
 
 logger = logging.getLogger(__name__)
 
-class FantraxService:
+class FantraxClient:
     """ Main Object Class
 
         Parameters:
@@ -163,7 +163,7 @@ class FantraxService:
         }
         
         try:
-            self._api._request("confirmOrExecuteTeamRosterChanges", **confirm_data)
+            self._request("confirmOrExecuteTeamRosterChanges", **confirm_data)
         except FantraxException as e:
             raise FantraxException(f"Failed to confirm lineup changes: {e}")
         
@@ -179,7 +179,7 @@ class FantraxService:
         }
         
         try:
-            self._api._request("confirmOrExecuteTeamRosterChanges", **execute_data)
+            self._request("confirmOrExecuteTeamRosterChanges", **execute_data)
         except FantraxException as e:
             raise FantraxException(f"Failed to execute lineup changes: {e}")
         

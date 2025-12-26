@@ -1,8 +1,5 @@
 from datetime import datetime, timedelta
 
-from fantrax_service.exceptions import FantraxException
-
-
 class Player:
     """ Represents a single Player.
 

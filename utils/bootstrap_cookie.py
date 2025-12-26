@@ -16,7 +16,7 @@ from typing import Optional
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from fantrax_service.fantraxservice import FantraxService
+from fantrax_service.clients.fantraxclient import FantraxClient
 from fantrax_service.exceptions import FantraxException, Unauthorized
 
 try:
@@ -145,7 +145,7 @@ Examples:
         )
         
         if cookie_file:
-            # Test the cookie file by initializing FantraxService and checking roster
+            # Test the cookie file by initializing FantraxClient and checking roster
             print(f"\n🔍 Testing cookie file...")
             try:
                 # Get league_id and team_id from args (they're required)
@@ -155,11 +155,11 @@ Examples:
                 if not league_id or not team_id:
                     print("⚠️  Skipping cookie test: league-id and team-id are required")
                 else:
-                    # Initialize FantraxService with the cookie file
-                    service = FantraxService(league_id, team_id, cookie_path=cookie_file)
+                    # Initialize FantraxClient with the cookie file
+                    client = FantraxClient(league_id, team_id, cookie_path=cookie_file)
                     
                     # Get roster info
-                    roster = service.roster_info()
+                    roster = client.roster_info()
                     
                     # Count players on the roster
                     player_count = sum(1 for row in roster.rows if row.player is not None)
