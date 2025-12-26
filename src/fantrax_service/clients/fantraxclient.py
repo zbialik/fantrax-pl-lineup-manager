@@ -99,11 +99,11 @@ class FantraxClient:
             self._positions = {k: Position(self, v) for k, v in self._request("getRefObject", type="Position")["allObjs"].items()}
         return self._positions
 
-    def team(self, team_id: str) -> Team:
+    def team(self, team_id: Optional[str] = None) -> Team:
         """ :class:`~Team` Object for the given Team ID.
 
             Parameters:
-                team_id (str): Team ID.
+                team_id (str): Team ID. If not provided, uses the instance's team_id.
 
             Returns:
                 :class:`~Team`
@@ -111,6 +111,8 @@ class FantraxClient:
             Raises:
                 :class:`FantraxException`: When an Invalid Team ID is provided.
         """
+        if team_id is None:
+            team_id = self.team_id
         for team in self.teams:
             if team.team_id == team_id:
                 return team
