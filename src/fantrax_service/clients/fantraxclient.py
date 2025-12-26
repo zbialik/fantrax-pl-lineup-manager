@@ -7,7 +7,9 @@ from requests import Session
 from json.decoder import JSONDecodeError
 from requests.exceptions import RequestException
 from fantrax_service.exceptions import FantraxException, Unauthorized
-from fantrax_service.objs import Team, Position, Roster
+from fantrax_service.roster import Roster
+from fantrax_service.player import Player
+
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,6 @@ class FantraxClient:
             self._load_cookies(cookie_path)
         
         self._teams = None
-        self._positions = None
 
     def _load_cookies(self, cookie_path: str) -> None:
         """Load authentication cookies from a pickle file into the session.
@@ -84,42 +85,8 @@ class FantraxClient:
             raise FantraxException(f"Error: {response_json}")
         return response_json["responses"][0]["data"]
 
-    @property
-    def teams(self) -> List[Team]:
-        if self._teams is None:
-            response = self._request("getFantasyTeams")
-            self._teams = []
-            for data in response["fantasyTeams"]:
-                self._teams.append(Team(self, data["id"], data["name"], data["shortName"], data["logoUrl256"]))
-        return self._teams
-
-    @property
-    def positions(self) -> Dict[str, Position]:
-        if self._positions is None:
-            self._positions = {k: Position(self, v) for k, v in self._request("getRefObject", type="Position")["allObjs"].items()}
-        return self._positions
-
-    def team(self, team_id: Optional[str] = None) -> Team:
-        """ :class:`~Team` Object for the given Team ID.
-
-            Parameters:
-                team_id (str): Team ID. If not provided, uses the instance's team_id.
-
-            Returns:
-                :class:`~Team`
-
-            Raises:
-                :class:`FantraxException`: When an Invalid Team ID is provided.
-        """
-        if team_id is None:
-            team_id = self.team_id
-        for team in self.teams:
-            if team.team_id == team_id:
-                return team
-        raise FantraxException(f"Team ID: {team_id} not found")
-
     def roster_info(self):
-        return Roster(self, self._request("getTeamRosterInfo", teamId=self.team_id), self.team_id)
+        return Roster(self._request("getTeamRosterInfo", teamId=self.team_id))
         
     def make_lineup_changes(self, changes: dict, apply_to_future_periods: bool = True) -> bool:
         """Make lineup changes for a team.

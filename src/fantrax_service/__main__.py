@@ -12,9 +12,10 @@ if __name__ == "__main__":
     parser.add_argument("--cookie-path", type=str, default=os.getenv('FANTRAX_COOKIE_FILE'), required=False)
     args = parser.parse_args()
     client = FantraxClient(args.league_id, args.team_id, cookie_path=args.cookie_path)
+    
     # Get roster info
     roster = client.roster_info()
     
-    # Count players on the roster
-    player_count = sum(1 for row in roster.rows if row.player is not None)
-    print(f"Player count: {player_count}")
+    print(f"roster players: ")
+    for p in roster.players:
+        print(p)
