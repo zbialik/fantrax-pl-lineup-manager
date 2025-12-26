@@ -16,8 +16,7 @@ if __name__ == "__main__":
     parser.add_argument("--team-id", type=str, default=os.getenv('TEAM_ID'), required=False)
     parser.add_argument("--cookie-path", type=str, default=os.getenv('FANTRAX_COOKIE_FILE'), required=False)
     args = parser.parse_args()
-    service = FantraxService(args.league_id, args.team_id, cookie_path=args.cookie_path)
-                    
+    service = FantraxService(args.league_id, args.team_id, cookie_path=args.cookie_path)                    
     # Get roster info
     roster = service.roster_info()
     

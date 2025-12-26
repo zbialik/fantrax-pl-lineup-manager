@@ -2,37 +2,36 @@
 
 A Python service that manages a Fantrax Premier League team's starting lineup.
 
-## Installation
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-```
-
 ## Quick Start
 
-### 1. Set up Authentication
+### 1. Init venv
+
+```bash
+python -m venv
+source venv/bin/activate
+pip install -e
+```
+
+### 2. Set up Authentication
 
 First, you need to extract your browser cookies from Fantrax:
 
 ```bash
 # Or manually run the bootstrap script
-pip install selenium webdriver-manager # dev specific libs
-python -m utils.bootstrap_cookie 
+pip install selenium webdriver-manager
+python -m utils.bootstrap_cookie --league-id <league_id> --team-id <team_id> -o deploy/fantraxloggedin.cookie
 ```
 
 This will create a cookie file that contains your authentication information.
 
-### 2. Test Run Service
-
-Run the provided example script to see the API in action:
+### 3. Test Run Service
 
 ```bash
 # Set environment variables
-source deploy/.env
+source deploy/.env # make sure this has 
 
 # Run service
-python src/fantrax_service
+python src/fantrax_service --league-id ${LEAGUE_ID} --team-id ${TEAM_ID} --cookie-path deploy/fantraxloggedin.cookie
 ```
 
 ## Development

@@ -2,3 +2,4 @@ deploy/*.cookie
 deploy/.env
 venv
 __pycache__
+*.egg-info
