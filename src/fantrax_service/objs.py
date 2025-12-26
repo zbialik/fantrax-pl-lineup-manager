@@ -119,7 +119,7 @@ class Roster:
             for group in data.get("tables", []):
                 for row in group.get("rows", []):
                     if "scorer" in row or row.get("statusId") == "1":
-                        self.rows.append(RosterRow(self._api, row))
+                        self.rows.append(Player(self._api, row))
         except Exception as e:
             print(f"Warning: Error processing roster rows: {e}")
             self.rows = []
@@ -131,7 +131,7 @@ class Roster:
             player_name (str): Player name to search for
             
         Returns:
-            RosterRow or None: The roster row containing the player, or None if not found
+            Player or None: The roster row containing the player, or None if not found
         """
         player_name_lower = player_name.lower()
         for row in self.rows:
@@ -143,7 +143,7 @@ class Roster:
         """Get all players currently in starting positions.
         
         Returns:
-            list: List of RosterRow objects for starters
+            list: List of Player objects for starters
         """
         starters = []
         for row in self.rows:
@@ -156,7 +156,7 @@ class Roster:
         """Get all players currently on the bench.
         
         Returns:
-            list: List of RosterRow objects for bench players
+            list: List of Player objects for bench players
         """
         bench = []
         for row in self.rows:
@@ -172,7 +172,7 @@ class Roster:
             position_short_name (str): Position abbreviation (e.g., "F", "D", "G")
             
         Returns:
-            list: List of RosterRow objects for players at that position
+            list: List of Player objects for players at that position
         """
         return [row for row in self.rows if row.player and row.pos.short_name == position_short_name]
 
@@ -183,7 +183,7 @@ class Roster:
         rows = "\n".join([str(r) for r in self.rows])
         return f"{self.team} Roster\n{rows}"
 
-class RosterRow:
+class Player:
     def __init__(self, api, data):
         print(data)
         self._api = api
