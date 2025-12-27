@@ -1,6 +1,13 @@
 from datetime import datetime, timedelta
 import json
 
+POSITION_MAP = {
+    "704": "G",
+    "703": "D",
+    "702": "M",
+    "701": "F"
+}
+
 class Player:
     def __init__(self, fantrax_player_row):        
         def game_week_status():
@@ -29,7 +36,7 @@ class Player:
                     return 'suspended'
                 else:
                     return None
- 
+
         # Store cleaned fantrax data
         self.fantrax = {
             'id': fantrax_player_row['scorer']['scorerId'],
@@ -37,7 +44,8 @@ class Player:
             'team_name': fantrax_player_row['scorer']['teamName'],
             'gameweek_status': game_week_status(),
             'general_status': general_status(),
-            'rostered_starter': True if fantrax_player_row["statusId"] == "1" else False
+            'rostered_starter': True if fantrax_player_row["statusId"] == "1" else False,
+            'rostered_position': POSITION_MAP.get(fantrax_player_row['posId'])
         }
     
     def _to_dict(self):
