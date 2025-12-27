@@ -1,10 +1,9 @@
 from datetime import datetime, timedelta
 import json
-from typing import List
-from collections.abc import MutableSequence
+from typing import List, Dict
 from fantrax_service.player import Player
 
-class Roster(MutableSequence):
+class Roster:
     def __init__(self, data):
         # Safely handle different roster data structures
         try:
@@ -33,31 +32,41 @@ class Roster(MutableSequence):
             self.max = 0
             self.injured = 0
         
-        self.players: List[Player] = []
+        self.players: Dict[str, Player] = {}
         try:
             for table in data.get("tables", []):
                 for row_item in table.get("rows", []):
                     if "scorer" in row_item:
-                        self.players.append(Player(row_item))
+                        player = Player(row_item)
+                        player_id = player.fantrax['id']
+                        self.players[player_id] = player
         except Exception as e:
             print(f"Warning: Error processing roster rows: {e}")
-            self.players = []
-
-    # Required abstract methods for MutableSequence
-    def __getitem__(self, index):
-        return self.players[index]
-    
-    def __setitem__(self, index, value):
-        self.players[index] = value
-    
-    def __delitem__(self, index):
-        del self.players[index]
+            self.players = {}
     
     def __len__(self):
+        """Return the number of players in the roster."""
         return len(self.players)
     
-    def insert(self, index, value):
-        self.players.insert(index, value)
+    def get_player(self, player_id: str) -> Player:
+        """Get a player by their Fantrax ID."""
+        return self.players.get(player_id)
+    
+    def __contains__(self, player_id: str) -> bool:
+        """Check if a player ID exists in the roster."""
+        return player_id in self.players
+    
+    def values(self):
+        """Return a view of all players in the roster."""
+        return self.players.values()
+    
+    def keys(self):
+        """Return a view of all player IDs in the roster."""
+        return self.players.keys()
+    
+    def items(self):
+        """Return a view of all (player_id, player) pairs in the roster."""
+        return self.players.items()
 
     def _to_dict(self):
         """Convert all attributes to a dictionary for JSON serialization."""
@@ -66,7 +75,7 @@ class Roster(MutableSequence):
             'reserve': self.reserve,
             'max': self.max,
             'injured': self.injured,
-            'players': [player._to_dict() for player in self.players]
+            'players': [player._to_dict() for player in self.players.values()]
         }
     
     def __str__(self):
@@ -81,4 +90,4 @@ class Roster(MutableSequence):
         # TODO: Implement logic to return only starters who are not starting (per domain rules)
         # Placeholder: currently returns all players
         
-        return self.players
+        return list(self.players.values())
