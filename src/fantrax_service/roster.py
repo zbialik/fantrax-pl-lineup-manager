@@ -2,6 +2,9 @@ from datetime import datetime, timedelta
 import json
 from typing import List, Dict
 from fantrax_service.player import Player
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Roster:
     def __init__(self, data):
@@ -26,7 +29,7 @@ class Roster:
                 
         except Exception as e:
             # Fallback to safe defaults if data structure is unexpected
-            print(f"Warning: Unexpected roster data structure: {e}")
+            logger.error(f"Unexpected roster data structure: {e}")
             self.active = 0
             self.reserve = 0
             self.max = 0
@@ -41,7 +44,7 @@ class Roster:
                         player_id = player.fantrax['id']
                         self.players[player_id] = player
         except Exception as e:
-            print(f"Warning: Error processing roster rows: {e}")
+            logger.error(f"Error processing roster rows: {e}")
             self.players = {}
     
     def __len__(self):
