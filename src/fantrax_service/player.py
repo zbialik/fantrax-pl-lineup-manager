@@ -2,44 +2,43 @@ from datetime import datetime, timedelta
 import json
 
 class Player:
-    def __init__(self, fantrax_player_row):
-        print(fantrax_player_row)
-        
-        def clean_fantrax_data(fantrax_player_row):
-            def fantrax_status():
-                # init status object to False for everything
-                status = {
-                    'will_not_play': False,
-                    'starting': False,
-                    'benched': False,
-                    'already_played': False
-                }
+    def __init__(self, fantrax_player_row):        
+        def game_week_status():
+            if fantrax_player_row["scorer"].get("disableLineupChange"):
+                return 'locked'
+            for icon in fantrax_player_row["scorer"].get("icons"):
+                # Set game status
+                if icon["typeId"] == "12": # starting
+                    return 'starting'
+                elif icon["typeId"] == "34": # on the bench but not starting
+                    return 'benched'
+                elif icon["typeId"] in ["15"]: # not rostered for game
+                    return 'out'
+                elif icon["typeId"] == "32": # expected to play in upcoming/current game
+                    return 'expected-to-play'
+                else:
+                    return None
 
-                if fantrax_player_row["scorer"].get("disableLineupChange"):
-                    status['already_played'] = fantrax_player_row["scorer"].get("disableLineupChange")
-                
-                for icon in fantrax_player_row["scorer"].get("icons"):
-                    if icon["typeId"] in ["1", "2", "6", "30"]: # DtD, Out, IR, Knee
-                        status["will_not_play"] = True
-                    if icon["typeId"] == "12": # starting
-                        status["starting"] = True
-                    # TODO: identify typeId for benched
-                    if icon["typeId"] == "????": # benched
-                        status["benched"] = True
-                return status
-
-            d = {
-                'scorerId': fantrax_player_row['scorer']['scorerId'],
-                'name': fantrax_player_row['scorer']['name'],
-                'team_name': fantrax_player_row['scorer']['teamName'],
-                'fantrax_status': fantrax_status(),
-                'rostered_starter': True if fantrax_player_row["statusId"] == "1" else False
-            }
-
-            return d
-        
+        def general_status():
+            for icon in fantrax_player_row["scorer"].get("icons"):
+                if icon["typeId"] == "30":
+                    return 'out-for-next-game'
+                elif icon["typeId"] == "1":
+                    return 'uncertain-gametime-decision'
+                elif icon["typeId"] == "6":
+                    return 'suspended'
+                else:
+                    return None
+ 
         # Store cleaned fantrax data
-        self.fantrax = clean_fantrax_data(fantrax_player_row)
+        self.fantrax = {
+            'id': fantrax_player_row['scorer']['scorerId'],
+            'name': fantrax_player_row['scorer']['name'],
+            'team_name': fantrax_player_row['scorer']['teamName'],
+            'gameweek_status': game_week_status(),
+            'general_status': general_status(),
+            'rostered_starter': True if fantrax_player_row["statusId"] == "1" else False
+        }
     
     def _to_dict(self):
         """Convert all attributes to a dictionary for JSON serialization."""

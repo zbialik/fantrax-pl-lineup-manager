@@ -14,8 +14,8 @@ if __name__ == "__main__":
     client = FantraxClient(args.league_id, args.team_id, cookie_path=args.cookie_path)
     
     # Get roster info
-    roster = client.roster_info()
+    roster = client.get_roster()
     
-    print(f"roster players: ")
-    for p in roster.players:
-        print(p)
+    # print(f"roster players: ")
+    # for p in roster.players:
+    #     print(p)

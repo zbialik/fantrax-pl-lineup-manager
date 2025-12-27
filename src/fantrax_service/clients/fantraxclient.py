@@ -85,7 +85,7 @@ class FantraxClient:
             raise FantraxException(f"Error: {response_json}")
         return response_json["responses"][0]["data"]
 
-    def roster_info(self):
+    def get_roster(self):
         return Roster(self._request("getTeamRosterInfo", teamId=self.team_id))
         
     def make_lineup_changes(self, changes: dict, apply_to_future_periods: bool = True) -> bool:
@@ -104,7 +104,7 @@ class FantraxClient:
             FantraxException: If the lineup change fails
         """
         # First, get current roster to build the complete fieldMap
-        roster = self.roster_info()
+        roster = self.get_roster()
         current_field_map = {}
         
         # Build current field map from existing roster
@@ -164,7 +164,7 @@ class FantraxClient:
         Returns:
             bool: True if swap was successful
         """
-        roster = self.roster_info()
+        roster = self.get_roster()
         
         # Find current status of both players
         player1_status = None

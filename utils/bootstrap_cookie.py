@@ -159,7 +159,7 @@ Examples:
                     client = FantraxClient(league_id, team_id, cookie_path=cookie_file)
                     
                     # Get roster info
-                    roster = client.roster_info()
+                    roster = client.get_roster()
                     
                     # Count players on the roster
                     player_count = sum(1 for row in roster.rows if row.player is not None)
