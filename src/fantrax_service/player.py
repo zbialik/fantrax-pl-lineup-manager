@@ -45,7 +45,8 @@ class Player:
             'gameweek_status': game_week_status(),
             'general_status': general_status(),
             'rostered_starter': True if fantrax_player_row["statusId"] == "1" else False,
-            'rostered_position': POSITION_MAP.get(fantrax_player_row['posId'])
+            'rostered_position_id': fantrax_player_row['posId'],
+            'rostered_position_short_name': POSITION_MAP.get(fantrax_player_row['posId'])
         }
     
     def _to_dict(self):

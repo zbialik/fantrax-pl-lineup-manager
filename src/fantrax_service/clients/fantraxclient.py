@@ -88,11 +88,11 @@ class FantraxClient:
     def get_roster(self):
         return Roster(self._request("getTeamRosterInfo", teamId=self.team_id))
         
-    def make_lineup_changes(self, changes: dict, apply_to_future_periods: bool = True) -> bool:
+    def make_lineup_changes(self, roster: Roster, changes: dict, apply_to_future_periods: bool = True) -> bool:
         """Make lineup changes for a team.
         
         Parameters:
-            team_id (str): The team ID to make changes for
+            roster (Roster): The roster to make changes on
             changes (dict): Dictionary mapping player IDs to new positions/status
                           Format: {"player_id": {"posId": "position_id", "stId": "status_id"}}
             apply_to_future_periods (bool): Whether to apply changes to future periods
@@ -103,16 +103,14 @@ class FantraxClient:
         Raises:
             FantraxException: If the lineup change fails
         """
-        # First, get current roster to build the complete fieldMap
-        roster = self.get_roster()
         current_field_map = {}
         
         # Build current field map from existing roster
-        for row in roster.rows:
-            if row.player:
-                current_field_map[row.player.id] = {
-                    "posId": row.pos_id,
-                    "stId": "1" if row.pos_id != "0" else "2"  # 1=starter, 2=bench
+        for player in roster.players:
+            if player.fantrax['id']:
+                current_field_map[player.fantrax['id']] = {
+                    "posId": player.fantrax['rostered_position'],
+                    "stId": "1" if player.fantrax['rostered_starter'] else "2"  # 1=starter, 2=bench
                 }
         
         # Apply the requested changes
@@ -154,23 +152,23 @@ class FantraxClient:
         
         return True
 
-    def swap_players(self, player1_id: str, player2_id: str) -> bool:
+    def swap_players(self, roster: Roster, player1_id: str, player2_id: str) -> bool:
         """Swap two players between starter and bench positions.
         
         Parameters:
+            roster (Roster): The roster to swap players on
             player1_id (str): First player ID
             player2_id (str): Second player ID
             
         Returns:
             bool: True if swap was successful
         """
-        roster = self.get_roster()
         
         # Find current status of both players
         player1_status = None
         player2_status = None
         
-        for row in roster.rows:
+        for player in roster.players:
             if row.player:
                 if row.player.id == player1_id:
                     player1_status = "1" if row.pos_id != "0" else "2"
@@ -186,7 +184,7 @@ class FantraxClient:
             player2_id: {"stId": player1_status}
         }
         
-        return self.make_lineup_changes(changes)
+        return self.make_lineup_changes(roster, changes)
 
     def move_to_starters(self, player_ids: list) -> bool:
         """Move specified players to starter positions.
