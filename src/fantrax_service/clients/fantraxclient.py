@@ -106,10 +106,10 @@ class FantraxClient:
         current_field_map = {}
         
         # Build current field map from existing roster
-        for player in roster.players:
+        for player in roster.players.values():
             if player.fantrax['id']:
                 current_field_map[player.fantrax['id']] = {
-                    "posId": player.fantrax['rostered_position'],
+                    "posId": player.fantrax.get('rostered_position_id', ''),
                     "stId": "1" if player.fantrax['rostered_starter'] else "2"  # 1=starter, 2=bench
                 }
         
@@ -165,18 +165,14 @@ class FantraxClient:
         """
         
         # Find current status of both players
-        player1_status = None
-        player2_status = None
+        player1 = roster.get_player(player1_id)
+        player2 = roster.get_player(player2_id)
         
-        for player in roster.players:
-            if row.player:
-                if row.player.id == player1_id:
-                    player1_status = "1" if row.pos_id != "0" else "2"
-                elif row.player.id == player2_id:
-                    player2_status = "1" if row.pos_id != "0" else "2"
-        
-        if player1_status is None or player2_status is None:
+        if not player1 or not player2:
             raise FantraxException("One or both players not found on roster")
+        
+        player1_status = "1" if player1.fantrax['rostered_starter'] else "2"
+        player2_status = "1" if player2.fantrax['rostered_starter'] else "2"
         
         # Swap their statuses
         changes = {
@@ -186,28 +182,28 @@ class FantraxClient:
         
         return self.make_lineup_changes(roster, changes)
 
-    def move_to_starters(self, player_ids: list) -> bool:
+    def move_to_starters(self, roster: Roster, player_ids: list) -> bool:
         """Move specified players to starter positions.
         
         Parameters:
-            team_id (str): The team ID
+            roster (Roster): The roster to make changes on
             player_ids (list): List of player IDs to move to starters
             
         Returns:
             bool: True if moves were successful
         """
         changes = {player_id: {"stId": "1"} for player_id in player_ids}
-        return self.make_lineup_changes(changes)
+        return self.make_lineup_changes(roster, changes)
 
-    def move_to_bench(self, player_ids: list) -> bool:
+    def move_to_bench(self, roster: Roster, player_ids: list) -> bool:
         """Move specified players to bench positions.
         
         Parameters:
-            team_id (str): The team ID
+            roster (Roster): The roster to make changes on
             player_ids (list): List of player IDs to move to bench
             
         Returns:
             bool: True if moves were successful
         """
         changes = {player_id: {"stId": "2"} for player_id in player_ids}
-        return self.make_lineup_changes(changes)
+        return self.make_lineup_changes(roster, changes)

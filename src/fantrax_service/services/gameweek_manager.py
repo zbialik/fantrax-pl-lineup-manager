@@ -1,19 +1,64 @@
 import asyncio
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 from fantrax_service.clients.fantraxclient import FantraxClient
 from fantrax_service.roster import Roster
+from fantrax_service.data.repositories import PlayerRepository, RosterRepository
+from fantrax_service.data.database import session_scope
+from fantrax_service.player import Player
 
 logger = logging.getLogger(__name__)
 
 
 class GameweekManager:
-    def __init__(self, client: FantraxClient, update_lineup_interval: int):
+    def __init__(
+        self,
+        client: FantraxClient,
+        update_lineup_interval: int,
+        use_repository: bool = True
+    ):
         self.client = client
-        self.roster = client.get_roster()
-        self._running = False
         self.update_lineup_interval = update_lineup_interval
+        self._running = False
+        self.use_repository = use_repository
+        
+        # Initialize repositories if using repository pattern
+        if self.use_repository:
+            self.player_repo = PlayerRepository()
+            self.roster_repo = RosterRepository(self.player_repo)
+        
+        # Get initial roster (will be refreshed from repository or client)
+        self._refresh_roster()
+    
+    def _refresh_roster(self):
+        """Refresh roster data from repository or client."""
+        if self.use_repository:
+            # Try to get roster from database, fallback to API if needed
+            try:
+                self.roster = self._get_roster_from_repository()
+            except Exception as e:
+                logger.warning(f"Failed to get roster from repository: {e}. Falling back to API.")
+                self.roster = self.client.get_roster()
+        else:
+            # Direct API call (legacy behavior)
+            self.roster = self.client.get_roster()
+    
+    def _get_roster_from_repository(self) -> Roster:
+        """Get roster from repository with enriched player data."""
+        # For now, we still need to fetch from API to get current roster state
+        # In the future, this could be stored in the database
+        roster_data = self.client._request("getTeamRosterInfo", teamId=self.client.team_id)
+        roster = Roster(roster_data)
+        
+        # Enrich each player with database data if available
+        with session_scope() as session:
+            for player_id, player in roster.players.items():
+                enriched_data = self.player_repo.get_enriched_player(player_id, session=session)
+                if enriched_data:
+                    player.load_enriched_data(enriched_data)
+        
+        return roster
     
     async def run(self):
         """Run the gameweek manager, executing optimize_lineup every 10 minutes."""
@@ -30,6 +75,9 @@ class GameweekManager:
     
     def update_lineup(self):
         logger.info(f"Updating fantrax lineup based on reported current gameweek rosters")
+        
+        # Refresh roster data before processing
+        self._refresh_roster()
         
         # Get all players
         all_players = list(self.roster.players.values())
@@ -58,7 +106,7 @@ class GameweekManager:
         def count_positions(players):
             counts = {'G': 0, 'D': 0, 'M': 0, 'F': 0}
             for player in players:
-                pos = player.fantrax.get('rostered_position')
+                pos = player.fantrax.get('rostered_position_short_name') or player.rostered_position
                 if pos in counts:
                     counts[pos] += 1
             return counts
@@ -76,8 +124,8 @@ class GameweekManager:
                 player_in = self.roster.get_player(player_in_id)
                 
                 if player_out and player_in:
-                    pos_out = player_out.fantrax.get('rostered_position')
-                    pos_in = player_in.fantrax.get('rostered_position')
+                    pos_out = player_out.fantrax.get('rostered_position_short_name') or player_out.rostered_position
+                    pos_in = player_in.fantrax.get('rostered_position_short_name') or player_in.rostered_position
                     
                     if pos_out in new_counts:
                         new_counts[pos_out] -= 1
@@ -117,13 +165,15 @@ class GameweekManager:
         
         problematic_starters_sorted = sorted(
             problematic_starters,
-            key=lambda p: position_priority.get(p.fantrax.get('rostered_position'), 0),
+            key=lambda p: position_priority.get(
+                p.fantrax.get('rostered_position_short_name') or p.rostered_position, 0
+            ),
             reverse=True
         )
         
         for player_out in problematic_starters_sorted:
             player_out_id = player_out.fantrax['id']
-            required_position = player_out.fantrax.get('rostered_position')
+            required_position = player_out.fantrax.get('rostered_position_short_name') or player_out.rostered_position
             
             if not required_position:
                 logger.warning(f"Player {player_out_id} has no position, skipping")
@@ -133,7 +183,7 @@ class GameweekManager:
             matching_reserves = [
                 r for r in reserves
                 if r.fantrax['id'] not in used_reserve_ids and
-                   r.fantrax.get('rostered_position') == required_position
+                   (r.fantrax.get('rostered_position_short_name') or r.rostered_position) == required_position
             ]
             
             if not matching_reserves:

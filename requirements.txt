@@ -15,4 +15,7 @@ typing-extensions==4.14.1
 urllib3==2.5.0
 websocket-client==1.8.0
 wsproto==1.2.0
+sqlalchemy==2.0.35
+alembic==1.14.0
+psycopg2-binary==2.9.10
 
