@@ -9,7 +9,6 @@ COPY setup.py .
 COPY src/ ./src/
 COPY deploy/ ./deploy/
 RUN pip install --no-cache-dir -e .
-COPY deploy/ ./deploy/
 
 # Default command - can be overridden
 CMD ["python", "-m", "fantrax_pl_lineup_manager"]

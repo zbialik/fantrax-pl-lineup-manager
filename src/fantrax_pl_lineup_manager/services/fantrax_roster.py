@@ -1,8 +1,7 @@
 from __future__ import annotations
 
-from ast import Tuple
 import json
-from typing import TYPE_CHECKING, List
+from typing import TYPE_CHECKING, List, Tuple
 from fantrax_pl_lineup_manager.services.fantrax_player import POSITION_MAP_BY_ID, POSITION_MAP_BY_SHORT_NAME, FantraxPlayer
 from fantrax_pl_lineup_manager.exceptions import FantraxException
 import logging
