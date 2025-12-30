@@ -10,15 +10,21 @@ logger = logging.getLogger(__name__)
 
 
 class GameweekManager:
-    def __init__(self, client: FantraxClient, team_id: str, update_lineup_interval: int):
+    def __init__(self, client: FantraxClient, team_id: str, update_lineup_interval: int, run_once: bool = False):
         self.roster:FantraxRoster = FantraxRoster(client, team_id)
         self._running = False
         self.update_lineup_interval = update_lineup_interval
-    
+        self.run_once = run_once
+            
     async def run(self):
         """Run the gameweek manager, executing optimize_lineup every 10 minutes."""
         self._running = True
         logger.info("Gameweek Manager running")
+        
+        if self.run_once:
+            logger.info("Running once, making substitutions")
+            await asyncio.to_thread(self.make_substitutions)
+            return
         
         while self._running:
             try:

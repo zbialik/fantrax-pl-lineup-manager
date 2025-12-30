@@ -169,15 +169,15 @@ class FantraxRoster:
         player2.swap_starting_status()
         self._sync_roster_with_fantrax()
     
-    def get_starters_not_playing_in_gameweek(self) -> List[FantraxPlayer]:
-        """Get starters that are not playing in the gameweek.
+    def get_starters_at_risk_not_playing_in_gameweek(self) -> List[FantraxPlayer]:
+        """Get starters that are at risk of not playing in the gameweek.
         
         Returns:
-            List[FantraxPlayer]: List of starters that are not playing in the gameweek
+            List[FantraxPlayer]: List of starters that are at risk of not playing in the gameweek (benched, suspended, out, or uncertain gametime decision)
         """
         out = []
         for player in self.starters:
-            if player.is_benched_or_suspended_or_out_in_gameweek:
+            if player.is_benched_or_suspended_or_out_in_gameweek or player.is_uncertain_gametime_decision_in_gameweek:
                 out.append(player)
         return out
 
@@ -208,9 +208,14 @@ class FantraxRoster:
 
     def get_optimal_substitutions(self) -> List[Tuple[FantraxPlayer, FantraxPlayer]]:
         """Get optimal substitutions based on the current gameweek roster."""
-        logger.debug(f"Getting starters not starting or expected to play")
-        starters_not_playing_in_gameweek = self.get_starters_not_playing_in_gameweek()
-        logger.info(f"Found {len(starters_not_playing_in_gameweek)} starters not playing in gameweek: {[player.name for player in starters_not_playing_in_gameweek]}")
+        
+        logger.debug(f"Getting starters at risk of not playing in gameweek")
+        starters_at_risk_not_playing_in_gameweek = self.get_starters_at_risk_not_playing_in_gameweek()
+        logger.info(f"Found {len(starters_at_risk_not_playing_in_gameweek)} starters at risk of not playing in gameweek: {[player.name for player in starters_at_risk_not_playing_in_gameweek]}")
+
+        # Sort starters_at_risk_not_playing_in_gameweek by fantasy value for gameweek (lowest first)
+        starters_at_risk_not_playing_in_gameweek.sort(key=lambda player: player.fantasy_value.value_for_gameweek)
+
 
         logger.debug(f"Getting reserves starting or expected to play")
         reserves_starting_or_expected_to_play = self.get_reserves_starting_or_expected_to_play()
@@ -221,7 +226,7 @@ class FantraxRoster:
 
         # Pair each starter with the highest value reserve
         substitutions = []
-        for starter in starters_not_playing_in_gameweek:
+        for starter in starters_at_risk_not_playing_in_gameweek:
             for reserve in reserves_starting_or_expected_to_play:
                 _valid_substitution = self.valid_substitution(starter.id, reserve.id)
                 if _valid_substitution[0]:

@@ -20,10 +20,11 @@ if __name__ == "__main__":
     parser.add_argument("--team-id", type=str, default=os.getenv('TEAM_ID'), required=False)
     parser.add_argument("--cookie-path", type=str, default="deploy/fantraxloggedin.cookie", required=False)
     parser.add_argument("--update-lineup-interval", type=int, default=600, required=False)
+    parser.add_argument("--run-once", action="store_true", default=False, required=False)
     args = parser.parse_args()
     
     client = FantraxClient(args.league_id, cookie_path=args.cookie_path)    
-    gameweek_manager = GameweekManager(client, args.team_id, args.update_lineup_interval)
+    gameweek_manager = GameweekManager(client, args.team_id, args.update_lineup_interval, run_once=args.run_once)
     try:
         asyncio.run(gameweek_manager.run())
     except KeyboardInterrupt:

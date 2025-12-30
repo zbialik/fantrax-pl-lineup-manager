@@ -54,6 +54,11 @@ class FantraxPlayer:
         return bool(check_statuses & self.icon_statuses)
     
     @property
+    def is_uncertain_gametime_decision_in_gameweek(self) -> bool:
+        check_statuses = set(['uncertain-gametime-decision'])
+        return bool(check_statuses & self.icon_statuses)
+    
+    @property
     def is_starting_in_gameweek(self) -> bool:
         check_statuses = set(['starting'])
         return bool(check_statuses & self.icon_statuses)
@@ -90,7 +95,7 @@ class FantraxPlayer:
             self.fantasy_value.value_for_gameweek += 3
         elif self.is_expected_to_play_in_gameweek:
             self.fantasy_value.value_for_gameweek += 2
-        elif self.is_benched_or_suspended_or_out_in_gameweek:
+        elif self.is_uncertain_gametime_decision_in_gameweek:
             self.fantasy_value.value_for_gameweek += 1
     
     def _to_dict(self):
