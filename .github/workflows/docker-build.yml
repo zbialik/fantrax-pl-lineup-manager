@@ -20,10 +20,12 @@ jobs:
       - name: Extract tag name
         id: tag
         run: |
+          REPO_NAME=${GITHUB_REPOSITORY#*/}
+          DOCKERHUB_USERNAME="zach17"
           if [[ "${{ github.ref }}" == refs/tags/* ]]; then
             TAG_NAME=${GITHUB_REF#refs/tags/}
             echo "tag=$TAG_NAME" >> $GITHUB_OUTPUT
-            echo "image_tag=zach17/fantrax-pl-lineup-manager:$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "image_tag=$DOCKERHUB_USERNAME/$REPO_NAME:$TAG_NAME" >> $GITHUB_OUTPUT
             echo "is_tag=true" >> $GITHUB_OUTPUT
           else
             echo "is_tag=false" >> $GITHUB_OUTPUT
