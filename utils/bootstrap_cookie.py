@@ -14,10 +14,12 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from fantrax_pl_lineup_manager.fantrax_roster import FantraxRoster
+
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from fantrax_service.clients.fantraxclient import FantraxClient
-from fantrax_service.exceptions import FantraxException, Unauthorized
+from fantrax_pl_lineup_manager.clients.fantraxclient import FantraxClient
+from fantrax_pl_lineup_manager.exceptions import FantraxException, Unauthorized
 
 try:
     from selenium import webdriver
@@ -159,33 +161,18 @@ Examples:
                     client = FantraxClient(league_id, team_id, cookie_path=cookie_file)
                     
                     # Get roster info
-                    roster = client.get_roster()
+                    roster = FantraxRoster(client, team_id)
                     
                     # Count players on the roster
-                    player_count = sum(1 for row in roster.rows if row.player is not None)
+                    player_count = len(roster.players)
                     
                     print(f"✅ Cookie file verified successfully!")
-                    print(f"   Team: {roster.team.name}")
-                    print(f"   Players found: {player_count}")
+                    print(f"   Team ID: ({roster.team_id})")
+                    print(f"   FantraxPlayers found: {player_count}")
                     
                     if player_count > 1:
-                        print(f"   ✅ Roster contains {player_count} players (more than 1)")
-                        
-                        # Display roster info
-                        print(f"\n📋 Roster Summary:")
-                        starters = roster.get_starters()
-                        bench = roster.get_bench_players()
-                        print(f"   Starters: {len(starters)}")
-                        print(f"   Bench: {len(bench)}")
-                        
-                        # Show first few players as examples
-                        print(f"\n   Sample players:")
-                        shown = 0
-                        for row in roster.rows:
-                            if row.player and shown < 5:
-                                status = "Starter" if row.pos_id != "0" else "Bench"
-                                print(f"     - {row.player.name} ({row.pos.short_name}) - {status}")
-                                shown += 1
+                        print(f"   ✅ FantraxRoster is valid:")
+                        print(f"{roster}")
                     else:
                         print(f"   ⚠️  Warning: Only {player_count} player(s) found on roster")
                         print(f"   This might indicate an authentication issue")
