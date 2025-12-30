@@ -9,7 +9,7 @@ A Python service that manages a Fantrax Premier League team's starting lineup.
 ```bash
 python -m venv
 source venv/bin/activate
-pip install -e
+pip install -e .
 ```
 
 ### 2. Set up Authentication
@@ -31,5 +31,5 @@ This will create a cookie file that contains your authentication information.
 source deploy/.env # make sure this has 
 
 # Run service
-python -m fantrax_service --league-id ${LEAGUE_ID} --team-id ${TEAM_ID} --cookie-path deploy/fantraxloggedin.cookie
+python -m fantrax_pl_lineup_manager --league-id ${LEAGUE_ID} --team-id ${TEAM_ID} --cookie-path deploy/fantraxloggedin.cookie
 ```
