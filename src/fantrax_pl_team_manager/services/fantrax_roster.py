@@ -97,6 +97,9 @@ class FantraxRoster:
         player1 = self.get_player(player1_id)
         player2 = self.get_player(player2_id)
 
+        if player1.disable_lineup_change or player2.disable_lineup_change:
+            return (False, f"Player {player1.name} or {player2.name} is disabled from lineup changes")
+
         if player1.rostered_starter and not player2.rostered_starter:
             starter = player1
             reserve = player2
@@ -201,7 +204,7 @@ class FantraxRoster:
         """
         out = []
         for player in self.reserves:
-            if player.is_expected_to_play_in_gameweek or player.is_starting_in_gameweek:
+            if (player.is_expected_to_play_in_gameweek or player.is_starting_in_gameweek) and not player.disable_lineup_change:
                 out.append(player)
         return out
 

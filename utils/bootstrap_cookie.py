@@ -12,14 +12,19 @@ import argparse
 import os
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import List, Optional
 
-from fantrax_pl_team_manager.fantrax_roster import FantraxRoster
+import logging
+import os
+import pickle
+from pathlib import Path
+from typing import Optional, Union, List, Dict
+from requests import Session
+from json.decoder import JSONDecodeError
+from requests.exceptions import RequestException
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from fantrax_pl_team_manager.clients.fantraxclient import FantraxClient
-from fantrax_pl_team_manager.exceptions import FantraxException, Unauthorized
 
 try:
     from selenium import webdriver
@@ -95,6 +100,27 @@ def bootstrap_cookies(
         raise
 
 
+def _request(session, league_id, method, **kwargs):
+    data = {"leagueId": league_id}
+    for key, value in kwargs.items():
+        data[key] = value
+    json_data = {"msgs": [{"method": method, "data": data}]}
+
+    try:
+        response = session.post("https://www.fantrax.com/fxpa/req", params={"leagueId": league_id}, json=json_data)
+        response_json = response.json()
+    except (RequestException, JSONDecodeError) as e:
+        raise Exception(f"Failed to Connect to {method}: {e}\nData: {data}")
+    if response.status_code >= 400:
+        raise Exception(f"({response.status_code} [{response.reason}]) {response_json}")
+    if "pageError" in response_json:
+        if "code" in response_json["pageError"]:
+            if response_json["pageError"]["code"] == "WARNING_NOT_LOGGED_IN":
+                raise Exception("Unauthorized: Not Logged in")
+        raise Exception(f"Error: {response_json}")
+    return response_json["responses"][0]["data"]            
+
+
 def main():
     """Main entry point for the bootstrap script."""
     
@@ -149,48 +175,33 @@ Examples:
         if cookie_file:
             # Test the cookie file by initializing FantraxClient and checking roster
             print(f"\n🔍 Testing cookie file...")
-            try:
-                # Get league_id and team_id from args (they're required)
-                league_id = args.league_id
-                team_id = args.team_id
+            _session = Session()
+            if not os.path.exists(cookie_file):
+                raise FileNotFoundError(f"Cookie file not found: {cookie_file}")
+            else:
+                cookie_file = Path(cookie_file)
                 
-                if not league_id or not team_id:
-                    print("⚠️  Skipping cookie test: league-id and team-id are required")
-                else:
-                    # Initialize FantraxClient with the cookie file
-                    client = FantraxClient(league_id, team_id, cookie_path=cookie_file)
-                    
-                    # Get roster info
-                    roster = FantraxRoster(client, team_id)
-                    
-                    # Count players on the roster
-                    player_count = len(roster.players)
-                    
-                    print(f"✅ Cookie file verified successfully!")
-                    print(f"   Team ID: ({roster.team_id})")
-                    print(f"   FantraxPlayers found: {player_count}")
-                    
-                    if player_count > 1:
-                        print(f"   ✅ FantraxRoster is valid:")
-                        print(f"{roster}")
-                    else:
-                        print(f"   ⚠️  Warning: Only {player_count} player(s) found on roster")
-                        print(f"   This might indicate an authentication issue")
-                    
-            except Unauthorized as e:
-                print(f"❌ Authentication failed: {e}")
-                print(f"   The cookie file may be invalid or expired")
-            except FantraxException as e:
-                print(f"❌ Error testing cookie: {e}")
-                print(f"   Please verify your league-id and team-id are correct")
+                if not cookie_file.exists():
+                    raise FileNotFoundError(f"Cookie file not found: {cookie_file}")
+                
+                with open(cookie_file, "rb") as f:
+                    cookies = pickle.load(f)
+                    for cookie in cookies:
+                        _session.cookies.set(cookie["name"], cookie["value"])
+            data = _request(_session, args.league_id, "getTeamRosterInfo", teamId=args.team_id)
+            player_rows_data= []
+            try:
+                for table in data.get("tables", []):
+                    for row_item in table.get("rows", []):
+                        if "scorer" in row_item:
+                            player_rows_data.append(row_item)
+                print(f"✅ Cookie file verified successfully!")
+                print(f"   Team ID: ({args.team_id})")
+                print(f"   FantraxPlayers found: {len(player_rows_data)}")
+                print(f"   Cookie file save to path:: {cookie_file}")
             except Exception as e:
                 print(f"❌ Unexpected error testing cookie: {e}")
-                print(f"   Cookie file saved, but verification failed")
-            
-            print(f"\n📝 Usage:")
-            print(f"   export FANTRAX_COOKIE_FILE='{cookie_file}'")
-            print(f"   python example_substitution.py --cookie-path '{cookie_file}'")
-            
+                print(f"   Cookie file saved, but verification failed")            
     except KeyboardInterrupt:
         print("\n❌ Bootstrap cancelled by user")
         sys.exit(1)
