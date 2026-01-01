@@ -51,4 +51,3 @@ class GameweekManager:
 
             # Substitute the players
             self.roster.substitute_players(substitution[1].id, substitution[0].id)
-    

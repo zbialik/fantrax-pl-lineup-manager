@@ -6,6 +6,7 @@ from typing import Optional, Union, List, Dict
 from requests import Session
 from json.decoder import JSONDecodeError
 from requests.exceptions import RequestException
+from fantrax_pl_team_manager.clients.get_cookies import fantrax_login_and_save_cookies
 from fantrax_pl_team_manager.exceptions import FantraxException, Unauthorized
 
 logger = logging.getLogger(__name__)
@@ -24,8 +25,12 @@ class FantraxClient:
             league_id (str): Fantrax League ID.
             teams (List[:class:`~Team`]): List of Teams in the League.
     """
-    def __init__(self, league_id: str, cookie_path: str):
+    def __init__(self, league_id: str, init_cookie_auth: bool, cookie_path: str, fantrax_username: str, fantrax_password: str):
         self.league_id = league_id
+
+        if init_cookie_auth:
+            fantrax_login_and_save_cookies(debug_mode=False, username=fantrax_username, password=fantrax_password, cookie_path=cookie_path)
+        
         # Create a new session and load cookies
         self._session = Session()
         if not os.path.exists(cookie_path):
