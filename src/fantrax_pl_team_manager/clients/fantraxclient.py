@@ -6,7 +6,7 @@ from typing import Optional, Union, List, Dict
 from requests import Session
 from json.decoder import JSONDecodeError
 from requests.exceptions import RequestException
-from fantrax_pl_lineup_manager.exceptions import FantraxException, Unauthorized
+from fantrax_pl_team_manager.exceptions import FantraxException, Unauthorized
 
 logger = logging.getLogger(__name__)
 

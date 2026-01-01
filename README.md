@@ -19,7 +19,8 @@ First, you need to extract your browser cookies from Fantrax:
 ```bash
 # Or manually run the bootstrap script
 pip install selenium webdriver-manager
-python -m utils.bootstrap_cookie --league-id <league_id> --team-id <team_id> -o deploy/fantraxloggedin.cookie
+
+python -m utils.bootstrap_cookie --league-id o90qdw15mc719reh --team-id jassfpe6mc719rep -o deploy/fantraxloggedin.cookie
 ```
 
 This will create a cookie file that contains your authentication information.
@@ -27,9 +28,6 @@ This will create a cookie file that contains your authentication information.
 ### 3. Test Run Service
 
 ```bash
-# Set environment variables
-source deploy/.env # make sure this has 
-
 # Run service
-python -m fantrax_pl_lineup_manager --league-id ${LEAGUE_ID} --team-id ${TEAM_ID} --cookie-path deploy/fantraxloggedin.cookie
+python -m fantrax_pl_team_manager --league-id o90qdw15mc719reh --team-id jassfpe6mc719rep --cookie-path deploy/fantraxloggedin.cookie
 ```

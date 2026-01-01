@@ -2,9 +2,9 @@ import asyncio
 import logging
 from typing import List, Tuple
 
-from fantrax_pl_lineup_manager.clients.fantraxclient import FantraxClient
-from fantrax_pl_lineup_manager.services.fantrax_player import FantraxPlayer
-from fantrax_pl_lineup_manager.services.fantrax_roster import FantraxRoster
+from fantrax_pl_team_manager.clients.fantraxclient import FantraxClient
+from fantrax_pl_team_manager.services.fantrax_player import FantraxPlayer
+from fantrax_pl_team_manager.services.fantrax_roster import FantraxRoster
 
 logger = logging.getLogger(__name__)
 

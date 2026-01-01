@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 from typing import TYPE_CHECKING, List, Tuple
-from fantrax_pl_lineup_manager.services.fantrax_player import POSITION_MAP_BY_ID, POSITION_MAP_BY_SHORT_NAME, FantraxPlayer
-from fantrax_pl_lineup_manager.exceptions import FantraxException
+from fantrax_pl_team_manager.services.fantrax_player import POSITION_MAP_BY_ID, POSITION_MAP_BY_SHORT_NAME, FantraxPlayer
+from fantrax_pl_team_manager.exceptions import FantraxException
 import logging
 
 if TYPE_CHECKING:
-    from fantrax_pl_lineup_manager.clients.fantraxclient import FantraxClient
+    from fantrax_pl_team_manager.clients.fantraxclient import FantraxClient
 
 logger = logging.getLogger(__name__)
 

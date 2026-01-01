@@ -14,12 +14,12 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from fantrax_pl_lineup_manager.fantrax_roster import FantraxRoster
+from fantrax_pl_team_manager.fantrax_roster import FantraxRoster
 
 # Add src directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-from fantrax_pl_lineup_manager.clients.fantraxclient import FantraxClient
-from fantrax_pl_lineup_manager.exceptions import FantraxException, Unauthorized
+from fantrax_pl_team_manager.clients.fantraxclient import FantraxClient
+from fantrax_pl_team_manager.exceptions import FantraxException, Unauthorized
 
 try:
     from selenium import webdriver

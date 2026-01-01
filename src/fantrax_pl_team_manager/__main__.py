@@ -3,8 +3,8 @@ import os
 import asyncio
 import logging
 
-from fantrax_pl_lineup_manager.clients.fantraxclient import FantraxClient
-from fantrax_pl_lineup_manager.services.gameweek_manager import GameweekManager
+from fantrax_pl_team_manager.clients.fantraxclient import FantraxClient
+from fantrax_pl_team_manager.services.gameweek_manager import GameweekManager
 
 import argparse
 

@@ -11,5 +11,5 @@ COPY deploy/ ./deploy/
 RUN pip install --no-cache-dir -e .
 
 # Default command - can be overridden
-CMD ["python", "-m", "fantrax_pl_lineup_manager"]
+CMD ["python", "-m", "fantrax_pl_team_manager"]
 
