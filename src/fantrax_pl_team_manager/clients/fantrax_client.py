@@ -24,9 +24,6 @@ class FantraxClient:
             teams (List[:class:`~Team`]): List of Teams in the League.
     """
     def __init__(self, cookie_path: str):
-        self.default_headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
-        }
         # Create a new session and load cookies
         self._session = Session()
         if not os.path.exists(cookie_path):
@@ -62,7 +59,6 @@ class FantraxClient:
 
     def _request(self, payload, params={}, headers={}):
         logger.debug(f"Request JSON: {payload}")
-        headers = {**self.default_headers, **headers} # merge/override default headers with custom headers
 
         try:
             response = self._session.post("https://www.fantrax.com/fxpa/req", params=params, json=payload, headers=headers)
@@ -98,7 +94,12 @@ class FantraxClient:
                 }
             ],
         }
-        return self._request(payload, params={"leagueId": league_id})["responses"][0]["data"]
+
+        # Required for some reason
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+        }
+        return self._request(payload, params={"leagueId": league_id}, headers=headers)["responses"][0]["data"]
 
     def get_roster_data(self, league_id:str, team_id: str) -> Dict:
         """Get the roster info for a team.

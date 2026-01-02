@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from typing import TYPE_CHECKING, List, Tuple
+from typing import TYPE_CHECKING, Dict, List, Tuple
 from fantrax_pl_team_manager.services.fantrax_player import POSITION_MAP_BY_ID, POSITION_MAP_BY_SHORT_NAME, FantraxPlayer
 from fantrax_pl_team_manager.services.fantrax_roster_player import FantraxRosterPlayer
 from fantrax_pl_team_manager.exceptions import FantraxException
@@ -111,70 +111,81 @@ class FantraxRosterManager:
         Returns:
             bool: True if roster was successfully synced
         """
-        payload_data = {
-            "rosterLimitPeriod": 19,
-            "fantasyTeamId": self.team_id,
-            "daily": False,
-            "adminMode": False,
-            "confirm": False,
-            "applyToFuturePeriods": True,
-            "fieldMap": {}
+        payload = {
+            'msgs': [
+                {
+                    'method': 'confirmOrExecuteTeamRosterChanges', 
+                    'data': {
+                        "rosterLimitPeriod": 20,
+                        "fantasyTeamId": self.team_id,
+                        "daily": False,
+                        "adminMode": False,
+                        "confirm": False,
+                        "applyToFuturePeriods": True,
+                        "fieldMap": {}
+                    }
+                }
+            ],
         }
 
         for player in self.players:
-            payload_data["fieldMap"][player.id] = {
+            payload['msgs'][0]['data']['fieldMap'][player.id] = {
                 "posId": player.rostered_position_id,
                 "stId": player.rostered_status_id
             }
         
         try:
-            logger.debug(f"payload_data: {json.dumps(payload_data, indent=2)}")
-            self.client._request("confirmOrExecuteTeamRosterChanges", **payload_data)
+            logger.debug(f"payload_data: {json.dumps(payload, indent=2)}")
+            self.client._request(payload, params={"leagueId": self.league_id})
             logger.info(f"Roster synced with Fantrax")
         except FantraxException as e:
             raise FantraxException(f"Failed to execute lineup changes: {e}")
     
-    def valid_substitution(self, player1: FantraxRosterPlayer, player2: FantraxRosterPlayer) -> Tuple[bool, str]:
-        """Check if a substitution is valid."""
-        if player1.disable_lineup_change or player2.disable_lineup_change:
-            return (False, f"Player {player1.name} or {player2.name} is disabled from lineup changes")
-
-        if player1.rostered_starter and not player2.rostered_starter:
-            starter = player1
-            reserve = player2
-        elif not player1.rostered_starter and player2.rostered_starter:
-            starter = player2
-            reserve = player1
-        else:
-            # REQ: 1 player must be a starter and 1 player must be a reserve
-            return (False, f"Player {player1.name} and {player2.name} are both starters or reserves")
-
+    def valid_substitutions(self, swap_players: List[FantraxRosterPlayer], disable_min_position_counts_check: bool = False) -> Tuple[bool, str]:
+        """
+        Check if a list of substitutions is valid.
+        
+        Parameters:
+            swap_players (List[FantraxRosterPlayer]): List of players to swap
+            disable_min_position_counts_check (bool): Whether to disable checking if minimum position counts are met (useful for checking if a player can be promoted to starter)
+            
+        Returns:
+            Tuple[bool, str]: True if the substitutions are valid, False otherwise
+        """
+        
         starter_position_counts = {}
         for position_short_name in POSITION_MAP_BY_ID.values():
             starter_position_counts[position_short_name] = len(self.get_starters_by_position_short_name(position_short_name))
         
-        starter_position_counts[starter.rostered_position_short_name] -= 1 # starter will be moved to bench
-        starter_position_counts[reserve.rostered_position_short_name] += 1 # reserve will be moved to starter
+        for player in swap_players:
+            if player.disable_lineup_change:
+                return (False, f"Player {player.name} is disabled from lineup changes")
+            
+            if player.rostered_starter:
+                starter_position_counts[player.rostered_position_short_name] -= 1 # starter will be moved to bench
+            else:
+                starter_position_counts[player.rostered_position_short_name] += 1 # reserve will be moved to starter
+        
+        # REQ: at most 11 starters 
+        if sum(starter_position_counts.values()) > 11:
+            return (False, "Must have at most 11 starters")
 
-        # REQ: exactly 11 starters 
-        if sum(starter_position_counts.values()) != 11:
-            return (False, "Must have exactly 11 starters")
+        if not disable_min_position_counts_check:
+            # REQ: at least 3 Defenders
+            if starter_position_counts.get('D', 0) < 3:
+                return (False, "Must have at least 3 Defenders")
+            
+            # REQ: at least 3 Midfielders
+            if starter_position_counts.get('M', 0) < 3:
+                return (False, "Must have at least 3 Midfielders")
+            
+            # REQ: at least 1 Forwards
+            if starter_position_counts.get('F', 0) < 1:
+                return (False, "Must have at least 1 Forward")
         
-        # REQ: exactly 1 Goalkeeper
-        if starter_position_counts.get('G', 0) != 1:
-            return (False, "Must have exactly 1 Goalkeeper")
-        
-        # REQ: at least 3 Defenders
-        if starter_position_counts.get('D', 0) < 3:
-            return (False, "Must have at least 3 Defenders")
-        
-        # REQ: at least 3 Midfielders
-        if starter_position_counts.get('M', 0) < 3:
-            return (False, "Must have at least 3 Midfielders")
-        
-        # REQ: at least 1 Forwards
-        if starter_position_counts.get('F', 0) < 1:
-            return (False, "Must have at least 1 Forward")
+        # REQ: at most 1 Goalkeeper
+        if starter_position_counts.get('G', 0) > 1:
+            return (False, "Must have at most 1 Goalkeeper")
         
         # REQ: at most 5 Defender
         if starter_position_counts.get('D', 0) > 5:
@@ -189,23 +200,6 @@ class FantraxRosterManager:
             return (False, "Must have at most 3 Forwards")
         
         return (True, None)
-
-    def substitute_players(self, player1: FantraxRosterPlayer, player2: FantraxRosterPlayer):
-        """Substitute two players.
-        
-        Parameters:
-            player1 (FantraxRosterPlayer): First player to substitute
-            player2 (FantraxRosterPlayer): Second player to substitute
-        """
-        valid_substitution = self.valid_substitution(player1, player2)
-        if not valid_substitution[0]:
-            raise FantraxException(valid_substitution[1])
-        
-        # Swap their statuses
-        logger.info(f"Swapping {player1.name} and {player2.name}")
-        player1.swap_starting_status()
-        player2.swap_starting_status()
-        self._sync_roster_with_fantrax()
     
     def get_starters_at_risk_not_playing_in_gameweek(self) -> List[FantraxRosterPlayer]:
         """Get starters that are at risk of not playing in the gameweek.
@@ -230,7 +224,7 @@ class FantraxRosterManager:
         """
         if position_short_name not in POSITION_MAP_BY_ID.values():
             raise FantraxException(f"Invalid position: {position_short_name}")
-        return [player for player in self.starters if player.rostered_position_short_name == position_short_name and player.rostered_starter]
+        return [player for player in self.starters if player.rostered_position_short_name == position_short_name]
     
     def get_reserves_starting_or_expected_to_play(self) -> List[FantraxRosterPlayer]:
         """Get reserves that are starting or expected to play.
@@ -244,53 +238,73 @@ class FantraxRosterManager:
                 out.append(player)
         return out
 
+    def sort_players_by_gameweek_status_and_fantasy_value(self):
+        """Sort players by gameweek status and fantasy value for gameweek."""
+        
+        # Organize roster into groups, each sorted by fantasy value for gameweek:
+        # - starting or expected to play
+        # - uncertain gametime decision
+        # - benched, suspended, or out for this gameweek
+        _players_starting_or_expected_to_play:List[FantraxRosterPlayer] = []
+        _players_uncertain_gametime_decision:List[FantraxRosterPlayer] = []
+        _players_benched_suspended_or_out:List[FantraxRosterPlayer] = []
+        for player in self.players:
+            if player.is_expected_to_play_in_gameweek or player.is_starting_in_gameweek:
+                _players_starting_or_expected_to_play.append(player)
+            elif player.is_uncertain_gametime_decision_in_gameweek:
+                _players_uncertain_gametime_decision.append(player)
+            elif player.is_benched_or_suspended_or_out_in_gameweek:
+                _players_benched_suspended_or_out.append(player)
+            else:
+                logger.error(f"Player {player.name} has an unaccounted for status. (Icon statuses: {player.icon_statuses})")
+                _players_benched_suspended_or_out.append(player)
+        _players_starting_or_expected_to_play.sort(key=lambda player: player.fantasy_value.value_for_gameweek, reverse=True)
+        _players_uncertain_gametime_decision.sort(key=lambda player: player.fantasy_value.value_for_gameweek, reverse=True)
+        _players_benched_suspended_or_out.sort(key=lambda player: player.fantasy_value.value_for_gameweek, reverse=True)
+
+        # Combine the groups into a single list
+        _players = _players_starting_or_expected_to_play + _players_uncertain_gametime_decision + _players_benched_suspended_or_out
+        self.players = _players
+
+    def starting_lineup_by_position_short_name(self) -> Dict:
+        """Get the starting lineup as a dictionary."""
+        out = {}
+        for position_short_name in POSITION_MAP_BY_ID.values():
+            out[position_short_name] = [player.name for player in self.get_starters_by_position_short_name(position_short_name)]
+        return out
+    
     def optimize_lineup(self):
         """Optimize the lineup for the current roster."""
 
         logger.info(f"Starting optimize_lineup() for current roster")
         
-        # Find optimal substitutions
-        substitutions: List[Tuple[FantraxRosterPlayer, FantraxRosterPlayer]] = self.get_optimal_substitutions()
-        
-        logger.info(f"Found {len(substitutions)} optimal substitutions: {[substitution[1].name + ' -> ' + substitution[0].name for substitution in substitutions]}")
-        for substitution in substitutions:
-            logger.info(f"Substituting {substitution[1].name} for {substitution[0].name}")
+        # Sort the players based on custom logic (gameweek status and fantasy value for gameweek)
+        self.sort_players_by_gameweek_status_and_fantasy_value()
 
-            # Substitute the players
-            self.substitute_players(substitution[1], substitution[0])
+        # Reset all players as reserves unless they are locked from lineup changes
+        logger.info(f"Resetting all players as reserves unless they are locked from lineup changes")
+        for player in self.players:
+            if not player.disable_lineup_change:
+                player.change_to_reserve()
+
+        # Iterate through players and promote to starter unless they are an invalid substitution
+        logger.info(f"Iterating through players to promote to starter unless they are an invalid substitution")
+        for player in self.players:
+            if player.disable_lineup_change:
+                logger.info(f"Player {player.name} is locked from lineup changes, skipping")
+            else:
+                vs = self.valid_substitutions([player], disable_min_position_counts_check=True)
+                if vs[0]:
+                    logger.info(f"Promoting {player.name} to starter")
+                    player.change_to_starter()
+                else:
+                    logger.info(f"Player {player.name} cannot be promoted to starter: {vs[1]}")
+        
+        logger.info(f"Starting lineup optimized to: ")
+        print(json.dumps(self.starting_lineup_by_position_short_name(), indent=2))
+
+        # Sync the roster with Fantrax
+        self._sync_roster_with_fantrax()
         
         # Refresh the roster after updating the lineup
         self.refresh_roster()
-    
-    def get_optimal_substitutions(self) -> List[Tuple[FantraxRosterPlayer, FantraxRosterPlayer]]:
-        """Get optimal substitutions based on the current gameweek roster."""
-        
-        logger.debug(f"Getting starters at risk of not playing in gameweek")
-        starters_at_risk_not_playing_in_gameweek = self.get_starters_at_risk_not_playing_in_gameweek()
-        logger.info(f"Found {len(starters_at_risk_not_playing_in_gameweek)} starters at risk of not playing in gameweek: {[player.name for player in starters_at_risk_not_playing_in_gameweek]}")
-
-        # Sort starters_at_risk_not_playing_in_gameweek by fantasy value for gameweek (lowest first)
-        starters_at_risk_not_playing_in_gameweek.sort(key=lambda player: player.fantasy_value.value_for_gameweek)
-
-
-        logger.debug(f"Getting reserves starting or expected to play")
-        reserves_starting_or_expected_to_play = self.get_reserves_starting_or_expected_to_play()
-        logger.info(f"Found {len(reserves_starting_or_expected_to_play)} reserves starting or expected to play: {[player.name for player in reserves_starting_or_expected_to_play]}")
-
-        # Sort reserves_starting_or_expected_to_play by fantasy value for gameweek (highest first)
-        reserves_starting_or_expected_to_play.sort(key=lambda player: player.fantasy_value.value_for_gameweek, reverse=True)
-
-        # Pair each starter with the highest value reserve
-        substitutions = []
-        for starter in starters_at_risk_not_playing_in_gameweek:
-            for reserve in reserves_starting_or_expected_to_play:
-                _valid_substitution = self.valid_substitution(starter, reserve)
-                if _valid_substitution[0]:
-                    logger.info(f"Substitution is valid ({reserve.name} -> {starter.name})! Adding to list of substitutions and removing reserve from future consideration.")
-                    substitutions.append((starter, reserve))
-                    reserves_starting_or_expected_to_play.remove(reserve) # remove the reserve from the list to avoid pairing it with another starter
-                    break # break out of the inner loop to avoid pairing the starter with another reserve
-                else:
-                    logger.info(f"Substitution invalid ({reserve.name} -> {starter.name}): {_valid_substitution[1]}")
-        
-        return substitutions
