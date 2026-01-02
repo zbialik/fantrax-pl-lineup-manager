@@ -1,7 +1,12 @@
 import json
 import inspect
 from dataclasses import dataclass
+import logging
 from typing import List, Set
+from decimal import Decimal, InvalidOperation
+
+from fantrax_pl_team_manager.clients.fantrax_client import FantraxClient
+from fantrax_pl_team_manager.exceptions import FantraxException
 
 POSITION_MAP_BY_ID = {
     "704": "G",
@@ -21,33 +26,94 @@ STATUS_ICON_MAP_BY_ID = {
     "6": "suspended"
 }
 
+logger = logging.getLogger(__name__)
+
 @dataclass
 class FantasyValue:
     value_for_gameweek: int = 0
     value_for_future_gameweeks: int = 0
 
 class FantraxPlayer:
-    def __init__(self, fantrax_player_row):
-        self.name = fantrax_player_row['scorer']['name']
-        self.team_name = fantrax_player_row['scorer']['teamName']
-        self.id = fantrax_player_row['scorer']['scorerId']
-        self.rostered_status_id = fantrax_player_row['statusId']
-        self.rostered_position_id = fantrax_player_row['posId']
-        self.disable_lineup_change = fantrax_player_row["scorer"].get("disableLineupChange",False)
-        self.icons = fantrax_player_row["scorer"].get("icons",[])
-        self.icon_statuses: Set[str] = set([STATUS_ICON_MAP_BY_ID.get(icon["typeId"]) for icon in self.icons if icon["typeId"] in STATUS_ICON_MAP_BY_ID])
+    def __init__(self, client: FantraxClient, league_id: str, player_id: str):
+        self.client = client
+        self.league_id = league_id
+        self.id = player_id
 
+        self.name = None
+        self.team_name = None
+        self.icons = None
+        self.icon_statuses: Set[str] = None
+        self.highlight_stats = {}
+        self.recent_gameweeks_stats = {}
         self.fantasy_value = FantasyValue()
-        self.update_value_for_gameweek()
 
-    @property
-    def rostered_starter(self) -> bool:
-        return True if self.rostered_status_id == "1" else False
+        self.refresh_player_data() # used to set the above attributes
     
-    @property
-    def rostered_position_short_name(self) -> str:
-        return POSITION_MAP_BY_ID.get(self.rostered_position_id)
+    def refresh_player_data(self):
+        """Get the player info from Fantrax.
+        
+        Returns:
+            FantraxPlayer: The player
+        """
+
+        data = self.client.get_player_profile_data(self.league_id, self.id)
+
+        self.name = data['miscData'].get('name')
+        self.team_name = data['miscData'].get('teamName')
+        self.icons = data['miscData'].get('icons',[])
+        self.icon_statuses = set[str | None]([STATUS_ICON_MAP_BY_ID.get(icon["typeId"]) for icon in self.icons if icon["typeId"] in STATUS_ICON_MAP_BY_ID])
+        
+        _highlight_stats_list = data['miscData'].get('highlightStats',[])
+        for stat in _highlight_stats_list:
+            if 'shortName' in stat and 'value' in stat:
+                value = stat['value']
+                if isinstance(value, str) and value.endswith('%'):
+                    # Remove '%' and convert to Decimal divided by 100
+                    value = value.rstrip('%')
+                try:
+                    # Validate that numeric_value can be converted to Decimal
+                    decimal_value = Decimal(value)
+                    self.highlight_stats[stat['shortName']] = decimal_value / 100
+                except (InvalidOperation, ValueError):
+                    # If conversion fails, use the original value
+                    self.highlight_stats[stat['shortName']] = value
+        
+        try:
+            for table in data['sectionContent']['OVERVIEW']['tables']:
+                if table['caption'] == 'Recent Games':
+                    i = 0
+                    while i < len(table['header']['cells']):
+                        if 'name' in table['header']['cells'][i]:
+                            stat_key = table['header']['cells'][i]['name']
+                        else:
+                            stat_key = table['header']['cells'][i]['key']
+                        
+                        self.recent_gameweeks_stats[stat_key] = [] # init empty
+
+                        # get most recent 5 gameweeks stats (or less if not enough)
+                        j = 0
+                        while j < 5 and j < len(table['rows']):
+                            gameweek_stat_value = table['rows'][j]['cells'][i]['content']
+                            try:
+                                # Validate that numeric_value can be converted to Decimal
+                                decimal_gameweek_stat_value = Decimal(gameweek_stat_value)
+                                self.recent_gameweeks_stats[stat_key].append(decimal_gameweek_stat_value) # append stat to list
+                            except (InvalidOperation, ValueError):
+                                # If conversion fails, use the original value
+                                self.recent_gameweeks_stats[stat_key].append(gameweek_stat_value)
+                            j += 1
+                        i += 1
+        except Exception as e:
+            logger.error(f"Error processing recent trend stats: {e}")
+            raise FantraxException(f"Error processing recent trend stats: {e}")
+
+        # Finally, set priority value for gameweek
+        self._update_fantasy_value_for_gameweek()
     
+    def _update_fantasy_value_for_gameweek(self):
+        """Update the fantasy value for the gameweek."""
+        self.fantasy_value.value_for_gameweek += sum(self.recent_gameweeks_stats['Fantasy Points']) / len(self.recent_gameweeks_stats['Fantasy Points'])
+
     @property
     def is_benched_or_suspended_or_out_in_gameweek(self) -> bool:
         check_statuses = set(['benched', 'suspended', 'out', 'out-for-next-game'])
@@ -69,34 +135,6 @@ class FantraxPlayer:
             return True
         check_statuses = set(['expected-to-play'])
         return bool(check_statuses & self.icon_statuses)
-    
-    def change_position_by_short_name(self, position_short_name: str):
-        self.rostered_position_id = POSITION_MAP_BY_SHORT_NAME.get(position_short_name)
-    
-    def change_to_starter(self):
-        """Change the player to a starter."""
-        self.rostered_status_id = "1"
-    
-    def change_to_reserve(self):
-        """Change the player to a reserve."""
-        self.rostered_status_id = "2"
-    
-    def swap_starting_status(self):
-        """Swap the starting status of the player."""
-        if self.rostered_starter:
-            self.change_to_reserve()
-        else:
-            self.change_to_starter()
-
-    def update_value_for_gameweek(self):
-        """Update the value for the gameweek."""
-        # VALUE: Prefer 'starting' > 'expected-to-play' > others
-        if self.is_starting_in_gameweek:
-            self.fantasy_value.value_for_gameweek += 3
-        elif self.is_expected_to_play_in_gameweek:
-            self.fantasy_value.value_for_gameweek += 2
-        elif self.is_uncertain_gametime_decision_in_gameweek:
-            self.fantasy_value.value_for_gameweek += 1
     
     def _to_dict(self):
         """Convert all attributes to a dictionary for JSON serialization."""

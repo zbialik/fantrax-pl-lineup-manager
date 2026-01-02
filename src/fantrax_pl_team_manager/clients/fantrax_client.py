@@ -14,7 +14,6 @@ class FantraxClient:
     """ Main Object Class
 
         Parameters:
-            league_id (str): Fantrax League ID.
             session (Optional[Session]): Use you're own Session object
             cookie_path (Optional[str]): Path to cookie file for authentication.
                                         If not provided, will check FANTRAX_COOKIE_FILE env var.
@@ -24,8 +23,10 @@ class FantraxClient:
             league_id (str): Fantrax League ID.
             teams (List[:class:`~Team`]): List of Teams in the League.
     """
-    def __init__(self, league_id: str, cookie_path: str):
-        self.league_id = league_id
+    def __init__(self, cookie_path: str):
+        self.default_headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36'
+        }
         # Create a new session and load cookies
         self._session = Session()
         if not os.path.exists(cookie_path):
@@ -59,18 +60,15 @@ class FantraxClient:
         except Exception as e:
             raise FantraxException(f"Error loading cookie file {cookie_path}: {e}")
 
-    def _request(self, method, **kwargs):
-        data = {"leagueId": self.league_id}
-        for key, value in kwargs.items():
-            data[key] = value
-        json_data = {"msgs": [{"method": method, "data": data}]}
-        logger.debug(f"Request JSON: {json_data}")
+    def _request(self, payload, params={}, headers={}):
+        logger.debug(f"Request JSON: {payload}")
+        headers = {**self.default_headers, **headers} # merge/override default headers with custom headers
 
         try:
-            response = self._session.post("https://www.fantrax.com/fxpa/req", params={"leagueId": self.league_id}, json=json_data)
+            response = self._session.post("https://www.fantrax.com/fxpa/req", params=params, json=payload, headers=headers)
             response_json = response.json()
         except (RequestException, JSONDecodeError) as e:
-            raise FantraxException(f"Failed to Connect to {method}: {e}\nData: {data}")
+            raise FantraxException(f"Failed to Connect to Fantrax: {e}\nData: {payload}")
         logger.debug(f"Response ({response.status_code} [{response.reason}]) {response_json}")
         if response.status_code >= 400:
             raise FantraxException(f"({response.status_code} [{response.reason}]) {response_json}")
@@ -79,5 +77,48 @@ class FantraxClient:
                 if response_json["pageError"]["code"] == "WARNING_NOT_LOGGED_IN":
                     raise Unauthorized("Unauthorized: Not Logged in")
             raise FantraxException(f"Error: {response_json}")
-        return response_json["responses"][0]["data"]
+        return response_json
 
+    def get_player_profile_data(self, league_id: str, player_id: str) -> Dict:
+        """Get the player profile info for a player.
+        
+        Parameters:
+            player_id (str): Fantrax Player ID
+
+        Returns:
+            Dict: Roster info
+        """
+        payload = {
+            'msgs': [
+                {
+                    'method': 'getPlayerProfile', 
+                    'data': {
+                        'playerId': player_id
+                    }
+                }
+            ],
+        }
+        return self._request(payload, params={"leagueId": league_id})["responses"][0]["data"]
+
+    def get_roster_data(self, league_id:str, team_id: str) -> Dict:
+        """Get the roster info for a team.
+        
+        Parameters:
+            team_id (str): Fantrax Team ID
+        
+        Returns:
+            Dict: Roster info
+        """
+        payload = {
+            'msgs': [
+                {
+                    'method': 'getTeamRosterInfo', 
+                    'data': {
+                        'leagueId': league_id, 
+                        'teamId': team_id
+                    }
+                }
+            ]
+        }
+        
+        return self._request(payload, params={"leagueId": league_id})["responses"][0]["data"]

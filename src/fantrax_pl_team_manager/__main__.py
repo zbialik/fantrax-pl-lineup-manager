@@ -3,8 +3,8 @@ import os
 import asyncio
 import logging
 
-from fantrax_pl_team_manager.clients.fantraxclient import FantraxClient
-from fantrax_pl_team_manager.services.gameweek_manager import GameweekManager
+from fantrax_pl_team_manager.clients.fantrax_client import FantraxClient
+from fantrax_pl_team_manager.services.fantrax_roster_manager import FantraxRosterManager
 
 import argparse
 
@@ -23,10 +23,10 @@ if __name__ == "__main__":
     parser.add_argument("--run-once", action="store_true", default=False, required=False)
     args = parser.parse_args()
     
-    client = FantraxClient(args.league_id, cookie_path=args.cookie_path)    
-    gameweek_manager = GameweekManager(client, args.team_id, args.update_lineup_interval, run_once=args.run_once)
+    client = FantraxClient(cookie_path=args.cookie_path)
+    roster_manager = FantraxRosterManager(client, args.league_id, args.team_id, args.update_lineup_interval, run_once=args.run_once)
     try:
-        asyncio.run(gameweek_manager.run())
+        asyncio.run(roster_manager.run())
     except KeyboardInterrupt:
         print("\nShutting down gracefully...")
         sys.exit(0)
