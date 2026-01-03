@@ -307,6 +307,9 @@ class FantraxRosterManager:
 
         logger.info(f"Starting optimize_lineup() for current roster")
         
+        # Refresh the roster after updating the lineup
+        self.refresh_roster()
+        
         # Sort the players based on custom logic (gameweek status and fantasy value for gameweek)
         self.sort_players_by_gameweek_status_and_fantasy_value()
 
@@ -334,6 +337,3 @@ class FantraxRosterManager:
 
         # Sync the roster with Fantrax
         self._sync_roster_with_fantrax()
-        
-        # Refresh the roster after updating the lineup
-        self.refresh_roster()
