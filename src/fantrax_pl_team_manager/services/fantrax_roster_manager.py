@@ -3,8 +3,20 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 import json
-from typing import TYPE_CHECKING, Dict, List, Tuple
-from fantrax_pl_team_manager.services.fantrax_player import POSITION_MAP_BY_ID, POSITION_MAP_BY_SHORT_NAME, FantraxPlayer
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
+from fantrax_pl_team_manager.services.fantrax_player import (
+    POSITION_MAP_BY_ID,
+    POSITION_MAP_BY_SHORT_NAME,
+    FantraxPlayer,
+    MIN_STARTERS,
+    MIN_DEFENDERS,
+    MIN_MIDFIELDERS,
+    MIN_FORWARDS,
+    MAX_GOALKEEPERS,
+    MAX_DEFENDERS,
+    MAX_MIDFIELDERS,
+    MAX_FORWARDS
+)
 from fantrax_pl_team_manager.services.fantrax_roster_player import FantraxRosterPlayer
 from fantrax_pl_team_manager.exceptions import FantraxException
 import logging
@@ -106,8 +118,12 @@ class FantraxRosterManager:
             logger.error(f"Error processing roster rows: {e}")
             raise FantraxException(f"Error processing roster rows: {e}")
 
-    def _to_dict(self):
-        """Convert all attributes to a dictionary for JSON serialization."""
+    def _to_dict(self) -> Dict[str, Any]:
+        """Convert all attributes to a dictionary for JSON serialization.
+        
+        Returns:
+            Dict[str, Any]: Dictionary containing roster players
+        """
         return {
             'players': [player._to_dict() for player in self.players]
         }
@@ -122,9 +138,20 @@ class FantraxRosterManager:
     
     @property
     def starters(self) -> List[FantraxRosterPlayer]:
+        """Get all players currently in starting lineup.
+        
+        Returns:
+            List[FantraxRosterPlayer]: List of starting players
+        """
         return [player for player in self.players if player.rostered_starter]
+    
     @property
     def reserves(self) -> List[FantraxRosterPlayer]:
+        """Get all players currently on the bench.
+        
+        Returns:
+            List[FantraxRosterPlayer]: List of reserve players
+        """
         return [player for player in self.players if not player.rostered_starter]
 
     def get_roster_player(self, player_id:str) -> FantraxRosterPlayer:
@@ -134,11 +161,11 @@ class FantraxRosterManager:
                 return player
         raise FantraxException(f"Player not found: {player_id}")
 
-    def _sync_roster_with_fantrax(self):
-        """Sync the roster with Fantrax.
+    def _sync_roster_with_fantrax(self) -> None:
+        """Sync the roster with Fantrax by sending lineup changes.
         
-        Returns:
-            bool: True if roster was successfully synced
+        Raises:
+            FantraxException: If roster sync fails
         """
         payload = {
             'msgs': [
@@ -170,16 +197,22 @@ class FantraxRosterManager:
         except FantraxException as e:
             raise FantraxException(f"Failed to execute lineup changes: {e}")
     
-    def valid_substitutions(self, swap_players: List[FantraxRosterPlayer], disable_min_position_counts_check: bool = False) -> Tuple[bool, str]:
-        """
-        Check if a list of substitutions is valid.
+    def valid_substitutions(self, swap_players: List[FantraxRosterPlayer], disable_min_position_counts_check: bool = False) -> Tuple[bool, Optional[str]]:
+        """Check if a list of substitutions is valid.
+        
+        Validates that the proposed substitutions would result in a valid lineup
+        according to position requirements (min/max counts per position).
         
         Parameters:
-            swap_players (List[FantraxRosterPlayer]): List of players to swap
-            disable_min_position_counts_check (bool): Whether to disable checking if minimum position counts are met (useful for checking if a player can be promoted to starter)
+            swap_players: List of players to swap between starter and reserve
+            disable_min_position_counts_check: Whether to disable checking minimum
+                position counts (useful when checking if a player can be promoted
+                to starter incrementally)
             
         Returns:
-            Tuple[bool, str]: True if the substitutions are valid, False otherwise
+            Tuple containing:
+                - bool: True if substitutions are valid, False otherwise
+                - Optional[str]: Error message if invalid, None if valid
         """
         
         starter_position_counts = {}
@@ -195,38 +228,38 @@ class FantraxRosterManager:
             else:
                 starter_position_counts[player.rostered_position_short_name] += 1 # reserve will be moved to starter
         
-        # REQ: at most 11 starters 
-        if sum(starter_position_counts.values()) > 11:
-            return (False, "Must have at most 11 starters")
+        # REQ: at most MIN_STARTERS starters 
+        if sum(starter_position_counts.values()) > MIN_STARTERS:
+            return (False, f"Must have at most {MIN_STARTERS} starters")
 
         if not disable_min_position_counts_check:
-            # REQ: at least 3 Defenders
-            if starter_position_counts.get('D', 0) < 3:
-                return (False, "Must have at least 3 Defenders")
+            # REQ: at least MIN_DEFENDERS Defenders
+            if starter_position_counts.get('D', 0) < MIN_DEFENDERS:
+                return (False, f"Must have at least {MIN_DEFENDERS} Defenders")
             
-            # REQ: at least 3 Midfielders
-            if starter_position_counts.get('M', 0) < 3:
-                return (False, "Must have at least 3 Midfielders")
+            # REQ: at least MIN_MIDFIELDERS Midfielders
+            if starter_position_counts.get('M', 0) < MIN_MIDFIELDERS:
+                return (False, f"Must have at least {MIN_MIDFIELDERS} Midfielders")
             
-            # REQ: at least 1 Forwards
-            if starter_position_counts.get('F', 0) < 1:
-                return (False, "Must have at least 1 Forward")
+            # REQ: at least MIN_FORWARDS Forwards
+            if starter_position_counts.get('F', 0) < MIN_FORWARDS:
+                return (False, f"Must have at least {MIN_FORWARDS} Forward")
         
-        # REQ: at most 1 Goalkeeper
-        if starter_position_counts.get('G', 0) > 1:
-            return (False, "Must have at most 1 Goalkeeper")
+        # REQ: at most MAX_GOALKEEPERS Goalkeeper
+        if starter_position_counts.get('G', 0) > MAX_GOALKEEPERS:
+            return (False, f"Must have at most {MAX_GOALKEEPERS} Goalkeeper")
         
-        # REQ: at most 5 Defender
-        if starter_position_counts.get('D', 0) > 5:
-            return (False, "Must have at most 5 Defenders")
+        # REQ: at most MAX_DEFENDERS Defenders
+        if starter_position_counts.get('D', 0) > MAX_DEFENDERS:
+            return (False, f"Must have at most {MAX_DEFENDERS} Defenders")
         
-        # REQ: at most 5 Midfielders
-        if starter_position_counts.get('M', 0) > 5:
-            return (False, "Must have at most 5 Midfielders")
+        # REQ: at most MAX_MIDFIELDERS Midfielders
+        if starter_position_counts.get('M', 0) > MAX_MIDFIELDERS:
+            return (False, f"Must have at most {MAX_MIDFIELDERS} Midfielders")
         
-        # REQ: at most 3 Forwards
-        if starter_position_counts.get('F', 0) > 3:
-            return (False, "Must have at most 3 Forwards")
+        # REQ: at most MAX_FORWARDS Forwards
+        if starter_position_counts.get('F', 0) > MAX_FORWARDS:
+            return (False, f"Must have at most {MAX_FORWARDS} Forwards")
         
         return (True, None)
     
