@@ -1,4 +1,6 @@
+# When upgrading python also update the python version in the github workflow (for running pytest)
 FROM python:3.13-slim
+
 # Set working directory
 WORKDIR /app
 

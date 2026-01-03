@@ -2,7 +2,7 @@ import json
 import inspect
 from dataclasses import dataclass
 import logging
-from typing import List, Set
+from typing import Any, Dict, List, Set
 from decimal import Decimal, InvalidOperation
 
 from fantrax_pl_team_manager.clients.fantrax_client import FantraxClient
@@ -13,7 +13,7 @@ from fantrax_pl_team_manager.services.fantrax_player import POSITION_MAP_BY_ID, 
 logger = logging.getLogger(__name__)
 
 class FantraxRosterPlayer(FantraxPlayer):
-    def __init__(self, client: FantraxClient, league_id: str, fantrax_roster_manager_row):
+    def __init__(self, client: FantraxClient, league_id: str, fantrax_roster_manager_row, premier_league_team_stats: Dict[str, Any]):
         self.client = client
         
         self.id = fantrax_roster_manager_row['scorer']['scorerId']
@@ -24,7 +24,7 @@ class FantraxRosterPlayer(FantraxPlayer):
         # TODO: see if this can be acquired from generic player data retrieved in super class instead
         self.disable_lineup_change = fantrax_roster_manager_row["scorer"].get("disableLineupChange",False)
 
-        super().__init__(client, league_id, self.id)
+        super().__init__(client, league_id, self.id, premier_league_team_stats)
     
     @property
     def rostered_starter(self) -> bool:

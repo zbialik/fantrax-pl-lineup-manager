@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass
 import json
 from typing import TYPE_CHECKING, Dict, List, Tuple
 from fantrax_pl_team_manager.services.fantrax_player import POSITION_MAP_BY_ID, POSITION_MAP_BY_SHORT_NAME, FantraxPlayer
@@ -23,22 +24,13 @@ class FantraxRosterManager:
         self.run_once = run_once
         self.team_name = self.get_team_name()
 
+        # The below gets set in refresh_premier_league_standings()
+        self.premier_league_team_stats:Dict[str, Any] = None
+        self.refresh_premier_league_team_stats()
+
         # The below gets set in refresh_roster()
         self.players:List[FantraxRosterPlayer] = None
         self.refresh_roster()
-    
-    def get_team_name(self) -> str:
-        """Get the name of the team."""
-        logger.debug(f"Getting team name for team {self.team_id}")
-        data = self.client.get_roster_data(self.league_id, self.team_id)
-        fantasyTeams = data.get("fantasyTeams", [])
-        for fantasyTeam in fantasyTeams:
-            if fantasyTeam.get("id") == self.team_id:
-                if fantasyTeam.get("name"):
-                    return fantasyTeam["name"]
-                else:
-                    raise FantraxException(f"'name' not found in team object: {str(fantasyTeam)}")
-        raise FantraxException(f"Team id not found in returned list of teams: {str(fantasyTeams)}")
     
     async def run(self):
         """Run the roster manager."""
@@ -57,22 +49,59 @@ class FantraxRosterManager:
                 logger.error(f"Error during lineup optimization: {e}", exc_info=True)
             
             await asyncio.sleep(self.update_lineup_interval)
+
+    def get_team_name(self) -> str:
+        """Get the name of the team."""
+        logger.debug(f"Getting team name for team {self.team_id}")
+        data = self.client.get_roster_data(self.league_id, self.team_id)
+        fantasyTeams = data.get("fantasyTeams", [])
+        for fantasyTeam in fantasyTeams:
+            if fantasyTeam.get("id") == self.team_id:
+                if fantasyTeam.get("name"):
+                    return fantasyTeam["name"]
+                else:
+                    raise FantraxException(f"'name' not found in team object: {str(fantasyTeam)}")
+        raise FantraxException(f"Team id not found in returned list of teams: {str(fantasyTeams)}")
+    
+    def refresh_premier_league_team_stats(self):
+        """Refresh the Premier League standings by team name."""
+        data = self.client.get_epl_league_stats()
+
+        team_name_lookup = {team.get("id"): team.get("name") for team in data["miscData"]['teams']}
+
+        _premier_league_team_stats = {}
+        for row in data['tables'][0]['rows']:
+            team_name = team_name_lookup.get(row['teamId'])
+            _premier_league_team_stats[team_name] = {
+                'rank': row['rank'],
+                'stats': {}
+            }
+            for i in range(len(row['stats'])):
+                stat_name = data['miscData']['headers'][i]['name']
+                stat_value = row['stats'][i]
+                _premier_league_team_stats[team_name]['stats'][stat_name] = stat_value
         
+        self.premier_league_team_stats = _premier_league_team_stats
+
     def refresh_roster(self):
         """Get the roster for the team.
         
         Returns:
             FantraxRosterManager: The roster for the team
         """
+        # Refresh premier league team stats
+        self.refresh_premier_league_team_stats()
+
         logger.info(f"Refreshing roster for team {self.team_name}")
         data = self.client.get_roster_data(self.league_id, self.team_id)
-        self.players:List[FantraxRosterPlayer] = []
+        _players:List[FantraxRosterPlayer] = []
         try:
             for table in data.get("tables", []):
                 for row_item in table.get("rows", []):
                     if "scorer" in row_item:
-                        player = FantraxRosterPlayer(self.client, self.league_id, row_item)
-                        self.players.append(player)
+                        player = FantraxRosterPlayer(self.client, self.league_id, row_item, self.premier_league_team_stats)
+                        _players.append(player)
+            self.players:List[FantraxRosterPlayer] = _players
         except Exception as e:
             logger.error(f"Error processing roster rows: {e}")
             raise FantraxException(f"Error processing roster rows: {e}")

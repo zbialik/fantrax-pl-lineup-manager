@@ -123,3 +123,25 @@ class FantraxClient:
         }
         
         return self._request(payload, params={"leagueId": league_id})["responses"][0]["data"]
+
+    def get_epl_league_stats(self) -> Dict:
+        """Get the Premier League standings.
+        
+        Parameters:
+            league_id (str): Fantrax League ID
+        
+        Returns:
+            Dict: Premier League standings
+        """
+        payload = {
+            "msgs": [
+                {
+                    "method": "getStandingsSport",
+                    "data": {
+                        "sportCode": "EPL",
+                        "newView": True
+                    }
+                }
+            ]
+        }
+        return self._request(payload)["responses"][0]["data"]

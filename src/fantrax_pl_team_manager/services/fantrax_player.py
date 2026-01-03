@@ -2,7 +2,7 @@ import json
 import inspect
 from dataclasses import dataclass
 import logging
-from typing import List, Set
+from typing import Any, Dict, List, Set
 from decimal import Decimal, InvalidOperation
 
 from fantrax_pl_team_manager.clients.fantrax_client import FantraxClient
@@ -34,7 +34,7 @@ class FantasyValue:
     value_for_future_gameweeks: int = 0
 
 class FantraxPlayer:
-    def __init__(self, client: FantraxClient, league_id: str, player_id: str):
+    def __init__(self, client: FantraxClient, league_id: str, player_id: str, premier_league_team_stats: Dict[str, Any] = None):
         self.client = client
         self.league_id = league_id
         self.id = player_id
@@ -46,20 +46,17 @@ class FantraxPlayer:
         self.highlight_stats = {}
         self.recent_gameweeks_stats = {}
         self.fantasy_value = FantasyValue()
-
+        self.upcoming_game_opponent = None
+        self.upcoming_game_home_or_away = None
+        self.premier_league_team_stats = premier_league_team_stats
         self.refresh_player_data() # used to set the above attributes
     
     def refresh_player_data(self):
-        """Get the player info from Fantrax.
-        
-        Returns:
-            FantraxPlayer: The player
-        """
-
+        """Get the player info from Fantrax."""
         data = self.client.get_player_profile_data(self.league_id, self.id)
 
         self.name = data['miscData'].get('name')
-        self.team_name = data['miscData'].get('teamName')
+        # self.team_name = data['miscData'].get('teamName')
         self.icons = data['miscData'].get('icons',[])
         self.icon_statuses = set[str | None]([STATUS_ICON_MAP_BY_ID.get(icon["typeId"]) for icon in self.icons if icon["typeId"] in STATUS_ICON_MAP_BY_ID])
         
@@ -80,6 +77,20 @@ class FantraxPlayer:
         
         try:
             for table in data['sectionContent']['OVERVIEW']['tables']:
+                if table['caption'] == 'Upcoming Games':
+                    i = 0
+                    while i < len(table['header']['cells']):
+                        if table['header']['cells'][i]['key'] == 'opp':
+                            opponent:str = table['rows'][0]['cells'][i]['content']
+                            if opponent.startswith('@'):
+                                opponent = opponent.lstrip('@')
+                                self.upcoming_game_home_or_away = 'away'
+                            else:
+                                self.upcoming_game_home_or_away = 'home'
+                            
+                            self.upcoming_game_opponent = opponent
+                            break
+                        i += 1
                 if table['caption'] == 'Recent Games':
                     i = 0
                     while i < len(table['header']['cells']):
@@ -87,6 +98,9 @@ class FantraxPlayer:
                             stat_key = table['header']['cells'][i]['name']
                         else:
                             stat_key = table['header']['cells'][i]['key']
+                        
+                        if stat_key == 'Team' or stat_key == 'team':
+                            self.team_name = table['rows'][0]['cells'][i]['toolTip']
                         
                         self.recent_gameweeks_stats[stat_key] = [] # init empty
 
@@ -112,7 +126,28 @@ class FantraxPlayer:
     
     def _update_fantasy_value_for_gameweek(self):
         """Update the fantasy value for the gameweek."""
+        import math
+
+        def get_upcoming_game_coefficient(k:int = 0.7, a:int = 1):
+            logger.debug(f"Calculating upcoming game coefficient for {self.team_name} vs {self.upcoming_game_opponent}")
+            if self.premier_league_team_stats.get(self.team_name) is None:
+                logger.error(f"Team {self.team_name} not found in Premier League team stats")
+                raise FantraxException(f"Team {self.team_name} not found in Premier League team stats")
+            if self.premier_league_team_stats.get(self.upcoming_game_opponent) is None:
+                logger.error(f"Opponent {self.upcoming_game_opponent} not found in Premier League team stats")
+                raise FantraxException(f"Opponent {self.upcoming_game_opponent} not found in Premier League team stats")
+            team_rank = self.premier_league_team_stats.get(self.team_name).get('rank')
+            opponent_rank = self.premier_league_team_stats.get(self.upcoming_game_opponent).get('rank')
+            N = len(self.premier_league_team_stats.keys())
+            m = 1 + k * math.tanh(a * (team_rank - opponent_rank) / (N - 1))
+            return m
+        
+        # Initialize fantasy value using recent gameweeks stats
         self.fantasy_value.value_for_gameweek += sum(self.recent_gameweeks_stats['Fantasy Points']) / len(self.recent_gameweeks_stats['Fantasy Points'])
+
+        # # Update fantasy value based on difficulty of upcoming game
+        upcoming_game_coefficient = get_upcoming_game_coefficient()
+        self.fantasy_value.value_for_gameweek *= Decimal(upcoming_game_coefficient)
 
     @property
     def is_benched_or_suspended_or_out_in_gameweek(self) -> bool:
