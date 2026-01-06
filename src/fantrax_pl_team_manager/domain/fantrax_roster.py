@@ -1,140 +1,33 @@
-from __future__ import annotations
-
-import asyncio
-from dataclasses import dataclass
 import json
-from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple
-from fantrax_pl_team_manager.services.fantrax_player import (
-    POSITION_MAP_BY_ID,
-    POSITION_MAP_BY_SHORT_NAME,
-    FantraxPlayer,
-    MIN_STARTERS,
-    MIN_DEFENDERS,
-    MIN_MIDFIELDERS,
-    MIN_FORWARDS,
-    MAX_GOALKEEPERS,
-    MAX_DEFENDERS,
-    MAX_MIDFIELDERS,
-    MAX_FORWARDS
-)
-from fantrax_pl_team_manager.services.fantrax_roster_player import FantraxRosterPlayer
-from fantrax_pl_team_manager.exceptions import FantraxException
+import inspect
+import math
+from dataclasses import dataclass
 import logging
+from typing import Any, Dict, List, Set, Optional, Callable, Tuple
+from decimal import Decimal, InvalidOperation
 
-if TYPE_CHECKING:
-    from fantrax_pl_team_manager.clients.fantrax_client import FantraxClient
+from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
+from fantrax_pl_team_manager.exceptions import FantraxException
+from fantrax_pl_team_manager.domain.constants import *
+
+from fantrax_pl_team_manager.domain.fantrax_roster_player import FantraxRosterPlayer
 
 logger = logging.getLogger(__name__)
 
-class FantraxRosterManager:
-    def __init__(self, client: FantraxClient, league_id: str, team_id: str, update_lineup_interval: int, run_once: bool = False):
-        self.league_id = league_id
+
+class FantraxRoster(List[FantraxRosterPlayer]):
+    """A list of FantraxRosterPlayer objects with custom sorting capabilities.
+    
+    This class extends Python's list to provide a custom sort() method
+    for sorting FantraxRosterPlayer objects.
+    """
+    
+    def __init__(self, team_id: str, team_name: str, roster_limit_period: int, premier_league_table: PremierLeagueTable = None, iterable: Optional[List[FantraxRosterPlayer]] = []):
         self.team_id = team_id
-        self.client = client
-        self._running = False
-        self.update_lineup_interval = update_lineup_interval
-        self.run_once = run_once
-        self.team_name = self.get_team_name()
-
-        # The below gets set in refresh_premier_league_standings()
-        self.premier_league_team_stats:Dict[str, Any] = None
-        self.refresh_premier_league_team_stats()
-
-        # The below gets set in refresh_roster()
-        self.players:List[FantraxRosterPlayer] = None
-        self.refresh_roster()
-    
-    async def run(self):
-        """Run the roster manager."""
-        self._running = True
-        logger.info("Fantrax Roster Manager running")
-        
-        if self.run_once:
-            logger.info("Running once, optimizing lineup")
-            await asyncio.to_thread(self.optimize_lineup)
-            return
-        
-        while self._running:
-            try:
-                await asyncio.to_thread(self.optimize_lineup)
-            except Exception as e:
-                logger.error(f"Error during lineup optimization: {e}", exc_info=True)
-            
-            await asyncio.sleep(self.update_lineup_interval)
-
-    def get_team_name(self) -> str:
-        """Get the name of the team."""
-        logger.debug(f"Getting team name for team {self.team_id}")
-        data = self.client.get_roster_data(self.league_id, self.team_id)
-        fantasyTeams = data.get("fantasyTeams", [])
-        for fantasyTeam in fantasyTeams:
-            if fantasyTeam.get("id") == self.team_id:
-                if fantasyTeam.get("name"):
-                    return fantasyTeam["name"]
-                else:
-                    raise FantraxException(f"'name' not found in team object: {str(fantasyTeam)}")
-        raise FantraxException(f"Team id not found in returned list of teams: {str(fantasyTeams)}")
-    
-    def refresh_premier_league_team_stats(self):
-        """Refresh the Premier League standings by team name."""
-        data = self.client.get_epl_league_stats()
-
-        team_name_lookup = {team.get("id"): team.get("name") for team in data["miscData"]['teams']}
-
-        _premier_league_team_stats = {}
-        for row in data['tables'][0]['rows']:
-            team_name = team_name_lookup.get(row['teamId'])
-            _premier_league_team_stats[team_name] = {
-                'rank': row['rank'],
-                'stats': {}
-            }
-            for i in range(len(row['stats'])):
-                stat_name = data['miscData']['headers'][i]['name']
-                stat_value = row['stats'][i]
-                _premier_league_team_stats[team_name]['stats'][stat_name] = stat_value
-        
-        self.premier_league_team_stats = _premier_league_team_stats
-
-    def refresh_roster(self):
-        """Get the roster for the team.
-        
-        Returns:
-            FantraxRosterManager: The roster for the team
-        """
-        # Refresh premier league team stats
-        self.refresh_premier_league_team_stats()
-
-        logger.info(f"Refreshing roster for team {self.team_name}")
-        data = self.client.get_roster_data(self.league_id, self.team_id)
-        _players:List[FantraxRosterPlayer] = []
-        try:
-            for table in data.get("tables", []):
-                for row_item in table.get("rows", []):
-                    if "scorer" in row_item:
-                        player = FantraxRosterPlayer(self.client, self.league_id, row_item, self.premier_league_team_stats)
-                        _players.append(player)
-            self.players:List[FantraxRosterPlayer] = _players
-        except Exception as e:
-            logger.error(f"Error processing roster rows: {e}")
-            raise FantraxException(f"Error processing roster rows: {e}")
-
-    def _to_dict(self) -> Dict[str, Any]:
-        """Convert all attributes to a dictionary for JSON serialization.
-        
-        Returns:
-            Dict[str, Any]: Dictionary containing roster players
-        """
-        return {
-            'players': [player._to_dict() for player in self.players]
-        }
-    
-    def __str__(self):
-        """Return JSON representation of roster data."""
-        return json.dumps(self._to_dict(), indent=2, default=str)
-    
-    def __repr__(self):
-        """Return JSON representation of roster data."""
-        return self.__str__()
+        self.team_name = team_name
+        self.roster_limit_period = roster_limit_period
+        self.premier_league_table:PremierLeagueTable = premier_league_table
+        super().__init__(iterable)
     
     @property
     def starters(self) -> List[FantraxRosterPlayer]:
@@ -143,7 +36,7 @@ class FantraxRosterManager:
         Returns:
             List[FantraxRosterPlayer]: List of starting players
         """
-        return [player for player in self.players if player.rostered_starter]
+        return [player for player in self if player.rostered_starter]
     
     @property
     def reserves(self) -> List[FantraxRosterPlayer]:
@@ -152,51 +45,29 @@ class FantraxRosterManager:
         Returns:
             List[FantraxRosterPlayer]: List of reserve players
         """
-        return [player for player in self.players if not player.rostered_starter]
+        return [player for player in self if not player.rostered_starter]
 
     def get_roster_player(self, player_id:str) -> FantraxRosterPlayer:
         """Get a player by their Fantrax ID."""
-        for player in self.players:
+        for player in self:
             if player.id == player_id:
                 return player
         raise FantraxException(f"Player not found: {player_id}")
-
-    def _sync_roster_with_fantrax(self) -> None:
-        """Sync the roster with Fantrax by sending lineup changes.
-        
-        Raises:
-            FantraxException: If roster sync fails
-        """
-        payload = {
-            'msgs': [
-                {
-                    'method': 'confirmOrExecuteTeamRosterChanges', 
-                    'data': {
-                        "rosterLimitPeriod": 20,
-                        "fantasyTeamId": self.team_id,
-                        "daily": False,
-                        "adminMode": False,
-                        "confirm": False,
-                        "applyToFuturePeriods": True,
-                        "fieldMap": {}
-                    }
-                }
-            ],
-        }
-
-        for player in self.players:
-            payload['msgs'][0]['data']['fieldMap'][player.id] = {
-                "posId": player.rostered_position_id,
-                "stId": player.rostered_status_id
-            }
-        
-        try:
-            logger.debug(f"payload_data: {json.dumps(payload, indent=2)}")
-            self.client._request(payload, params={"leagueId": self.league_id})
-            logger.info(f"Roster synced with Fantrax")
-        except FantraxException as e:
-            raise FantraxException(f"Failed to execute lineup changes: {e}")
     
+    def sort(self, *, key: Optional[Callable[[FantraxRosterPlayer], Any]] = None, reverse: bool = False) -> None:
+        """Sort the roster in place.
+        
+        Args:
+            key: Optional key function that extracts a comparison key from each player.
+                 If not provided, a default sorting will be used.
+            reverse: If True, sort in descending order
+        """
+        if key is None:
+            # Default sorting behavior - can be customized as needed
+            super().sort(key=key, reverse=reverse)
+        else:
+            super().sort(key=key, reverse=reverse)
+ 
     def valid_substitutions(self, swap_players: List[FantraxRosterPlayer], disable_min_position_counts_check: bool = False) -> Tuple[bool, Optional[str]]:
         """Check if a list of substitutions is valid.
         
@@ -215,18 +86,23 @@ class FantraxRosterManager:
                 - Optional[str]: Error message if invalid, None if valid
         """
         
-        starter_position_counts = {}
-        for position_short_name in POSITION_MAP_BY_ID.values():
-            starter_position_counts[position_short_name] = len(self.get_starters_by_position_short_name(position_short_name))
+        starter_position_counts:Dict[str, int] = {
+            POSITION_KEY_GOALKEEPER: 0,
+            POSITION_KEY_DEFENDER: 0,
+            POSITION_KEY_MIDFIELDER: 0,
+            POSITION_KEY_FORWARD: 0
+        }
+        for player in self.starters:
+            starter_position_counts[player.rostered_position] += 1
         
         for player in swap_players:
             if player.disable_lineup_change:
                 return (False, f"Player {player.name} is disabled from lineup changes")
             
             if player.rostered_starter:
-                starter_position_counts[player.rostered_position_short_name] -= 1 # starter will be moved to bench
+                starter_position_counts[player.rostered_position] -= 1 # starter will be moved to bench
             else:
-                starter_position_counts[player.rostered_position_short_name] += 1 # reserve will be moved to starter
+                starter_position_counts[player.rostered_position] += 1 # reserve will be moved to starter
         
         # REQ: at most MIN_STARTERS starters 
         if sum(starter_position_counts.values()) > MIN_STARTERS:
@@ -284,9 +160,9 @@ class FantraxRosterManager:
         Returns:
             List[FantraxRosterPlayer]: List of starters by position short name
         """
-        if position_short_name not in POSITION_MAP_BY_ID.values():
+        if position_short_name not in [POSITION_KEY_GOALKEEPER, POSITION_KEY_DEFENDER, POSITION_KEY_MIDFIELDER, POSITION_KEY_FORWARD]:
             raise FantraxException(f"Invalid position: {position_short_name}")
-        return [player for player in self.starters if player.rostered_position_short_name == position_short_name]
+        return [player for player in self.starters if player.rostered_position == position_short_name]
     
     def get_reserves_starting_or_expected_to_play(self) -> List[FantraxRosterPlayer]:
         """Get reserves that are starting or expected to play.
@@ -302,7 +178,7 @@ class FantraxRosterManager:
 
     def sort_players_by_gameweek_status_and_fantasy_value(self):
         """Sort players by gameweek status and fantasy value for gameweek."""
-        
+        logger.info(f"Current list of players prior to running sort operation: {[p.name for p in self]}")
         # Organize roster into groups, each sorted by fantasy value for gameweek:
         # - starting or expected to play
         # - uncertain gametime decision
@@ -310,7 +186,7 @@ class FantraxRosterManager:
         _players_starting_or_expected_to_play:List[FantraxRosterPlayer] = []
         _players_uncertain_gametime_decision:List[FantraxRosterPlayer] = []
         _players_benched_suspended_or_out:List[FantraxRosterPlayer] = []
-        for player in self.players:
+        for player in self:
             if player.is_expected_to_play_in_gameweek or player.is_starting_in_gameweek:
                 _players_starting_or_expected_to_play.append(player)
             elif player.is_uncertain_gametime_decision_in_gameweek:
@@ -325,13 +201,17 @@ class FantraxRosterManager:
         _players_benched_suspended_or_out.sort(key=lambda player: player.fantasy_value.value_for_gameweek, reverse=True)
 
         # Combine the groups into a single list
+        logger.debug(f"Players starting or expected to play: {_players_starting_or_expected_to_play}")
+        logger.debug(f"Players with uncertain gametime decision: {_players_uncertain_gametime_decision}")
+        logger.debug(f"Players benched, suspended, or out: {_players_benched_suspended_or_out}")
         _players = _players_starting_or_expected_to_play + _players_uncertain_gametime_decision + _players_benched_suspended_or_out
-        self.players = _players
+        self[:] = _players
+        logger.info(f"Sorted list of players by gameweek status and fantasy value: {[p.name for p in self]}")
 
     def starting_lineup_by_position_short_name(self) -> Dict:
         """Get the starting lineup as a dictionary."""
         out = {}
-        for position_short_name in POSITION_MAP_BY_ID.values():
+        for position_short_name in [POSITION_KEY_GOALKEEPER, POSITION_KEY_DEFENDER, POSITION_KEY_MIDFIELDER, POSITION_KEY_FORWARD]:
             out[position_short_name] = [player.name for player in self.get_starters_by_position_short_name(position_short_name)]
         return out
     
@@ -340,21 +220,18 @@ class FantraxRosterManager:
 
         logger.info(f"Starting optimize_lineup() for current roster")
         
-        # Refresh the roster after updating the lineup
-        self.refresh_roster()
-        
         # Sort the players based on custom logic (gameweek status and fantasy value for gameweek)
         self.sort_players_by_gameweek_status_and_fantasy_value()
 
         # Reset all players as reserves unless they are locked from lineup changes
         logger.info(f"Resetting all players as reserves unless they are locked from lineup changes")
-        for player in self.players:
+        for player in self:
             if not player.disable_lineup_change:
                 player.change_to_reserve()
-
+        
         # Iterate through players and promote to starter unless they are an invalid substitution
         logger.info(f"Iterating through players to promote to starter unless they are an invalid substitution")
-        for player in self.players:
+        for player in self:
             if player.disable_lineup_change:
                 logger.info(f"Player {player.name} is locked from lineup changes, skipping")
             else:
@@ -367,6 +244,3 @@ class FantraxRosterManager:
         
         logger.info(f"Starting lineup optimized to: ")
         print(json.dumps(self.starting_lineup_by_position_short_name(), indent=2))
-
-        # Sync the roster with Fantrax
-        self._sync_roster_with_fantrax()

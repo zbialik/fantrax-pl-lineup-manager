@@ -1,73 +1,42 @@
 from typing import Set
 import unittest
-from unittest.mock import Mock, MagicMock
-from fantrax_pl_team_manager.services.fantrax_roster_manager import FantraxRosterManager
-from fantrax_pl_team_manager.services.fantrax_player import FantasyValue
-from fantrax_pl_team_manager.clients.fantrax_client import FantraxClient
-from fantrax_pl_team_manager.services.fantrax_roster_player import FantraxRosterPlayer
+from unittest.mock import Mock
+from fantrax_pl_team_manager.domain.fantrax_roster import FantraxRoster
+from fantrax_pl_team_manager.domain.fantrax_player import FantasyValue
+from fantrax_pl_team_manager.domain.fantrax_roster_player import FantraxRosterPlayer
 
 
-class TestFantraxRosterManagerSorting(unittest.TestCase):
+class TestFantraxRoster(unittest.TestCase):
     """Test cases for sort_players_by_gameweek_status_and_fantasy_value method."""
     
     def setUp(self):
         """Set up test fixtures."""
-        # Create a mock client
-        self.mock_client = Mock()
-        self.mock_league_id = "test_league_id"
         self.mock_team_id = "test_team_id"
-        self.update_interval = 600
-        self.run_once = False
+        self.mock_team_name = "Test Team"
+        self.roster_limit_period = 1
         
-        # Mock the get_roster_data method to return minimal data for initialization
-        self.mock_client.get_roster_data.return_value = {
-            "fantasyTeams": [
-                {"id": self.mock_team_id, "name": "Test Team"}
-            ],
-            "tables": []
-        }
-        
-        # Create a mock roster manager (we'll override players)
-        self.roster_manager = FantraxRosterManager(
-            self.mock_client,
-            self.mock_league_id,
-            self.mock_team_id,
-            self.update_interval,
-            self.run_once
+        # Create a roster instance (we'll override players)
+        self.roster = FantraxRoster(
+            team_id=self.mock_team_id,
+            team_name=self.mock_team_name,
+            roster_limit_period=self.roster_limit_period
         )
     
     def _create_mock_player(self, name:str, icon_statuses:Set[str], fantasy_value:FantasyValue):
-        """Helper method to create a mock player.
-        """
-
+        """Helper method to create a mock player."""
         player = Mock(spec=FantraxRosterPlayer)
         player.name = name
         player.fantasy_value = fantasy_value
         player.icon_statuses = icon_statuses
         
-        # # Set status properties based on status_type
-        # if status_type == 'starting':
-        #     player.is_starting_in_gameweek = True
-        #     player.is_expected_to_play_in_gameweek = False
-        #     player.is_uncertain_gametime_decision_in_gameweek = False
-        #     player.is_benched_or_suspended_or_out_in_gameweek = False
-        # elif status_type == 'expected':
-        #     player.is_starting_in_gameweek = False
-        #     player.is_expected_to_play_in_gameweek = True
-        #     player.is_uncertain_gametime_decision_in_gameweek = False
-        #     player.is_benched_or_suspended_or_out_in_gameweek = False
-        # elif status_type == 'uncertain':
-        #     player.is_starting_in_gameweek = False
-        #     player.is_expected_to_play_in_gameweek = False
-        #     player.is_uncertain_gametime_decision_in_gameweek = True
-        #     player.is_benched_or_suspended_or_out_in_gameweek = False
-        # elif status_type in ['benched', 'suspended', 'out']:
-        #     player.is_starting_in_gameweek = False
-        #     player.is_expected_to_play_in_gameweek = False
-        #     player.is_uncertain_gametime_decision_in_gameweek = False
-        #     player.is_benched_or_suspended_or_out_in_gameweek = True
-        # else:
-        #     raise ValueError(f"Unknown status_type: {status_type}")
+        # Set status properties based on icon_statuses
+        # These properties are computed from icon_statuses in the actual class
+        player.is_starting_in_gameweek = 'starting' in icon_statuses
+        player.is_expected_to_play_in_gameweek = 'expected-to-play' in icon_statuses or not icon_statuses
+        player.is_uncertain_gametime_decision_in_gameweek = 'uncertain-gametime-decision' in icon_statuses
+        player.is_benched_or_suspended_or_out_in_gameweek = bool(
+            {'benched', 'suspended', 'out', 'out-for-next-game'} & icon_statuses
+        )
         
         return player
     
@@ -83,45 +52,45 @@ class TestFantraxRosterManagerSorting(unittest.TestCase):
             self._create_mock_player("status=starting, fantasy_value=30", {'starting'}, FantasyValue(value_for_gameweek=30)), 
         ]
         
-        self.roster_manager.players = players
-        self.roster_manager.sort_players_by_gameweek_status_and_fantasy_value()
+        self.roster[:] = players
+        self.roster.sort_players_by_gameweek_status_and_fantasy_value()
         
         # Expected order:
         # 1. Starting/Expected (sorted by value desc)
         # 2. Uncertain (sorted by value desc)
         # 3. Benched/Suspended/Out (sorted by value desc)
         expected_order = [
-            "status=out, fantasy_value=50", 
             "status=expected-to-play, fantasy_value=40", 
             "status=starting, fantasy_value=30", 
             "status=uncertain-gametime-decision, fantasy_value=20", 
+            "status=out, fantasy_value=50", 
             "status=suspended, fantasy_value=15", 
             "status=benched, fantasy_value=10"
         ]
-        actual_order = [player.name for player in self.roster_manager.players]
+        actual_order = [player.name for player in self.roster]
         
         self.assertEqual(actual_order, expected_order, 
                         f"Expected order: {expected_order}, but got: {actual_order}")
         
         # Verify groups are correctly separated
-        # First 3 should be starting/expected
-        for i in range(3):
+        # First 2 should be starting/expected
+        for i in range(2):
             self.assertTrue(
-                self.roster_manager.players[i].is_starting_in_gameweek or 
-                self.roster_manager.players[i].is_expected_to_play_in_gameweek,
+                self.roster[i].is_starting_in_gameweek or 
+                self.roster[i].is_expected_to_play_in_gameweek,
                 f"Player {i} should be starting or expected to play"
             )
         
-        # Player at index 3 should be uncertain
+        # Player at index 2 should be uncertain
         self.assertTrue(
-            self.roster_manager.players[3].is_uncertain_gametime_decision_in_gameweek,
-            "Player at index 3 should be uncertain"
+            self.roster[2].is_uncertain_gametime_decision_in_gameweek,
+            "Player at index 2 should be uncertain"
         )
         
-        # Last 2 should be benched/suspended/out
-        for i in range(4, 6):
+        # Last 3 should be benched/suspended/out
+        for i in range(3, 6):
             self.assertTrue(
-                self.roster_manager.players[i].is_benched_or_suspended_or_out_in_gameweek,
+                self.roster[i].is_benched_or_suspended_or_out_in_gameweek,
                 f"Player {i} should be benched, suspended, or out"
             )
     
@@ -134,8 +103,8 @@ class TestFantraxRosterManagerSorting(unittest.TestCase):
             self._create_mock_player("status=starting, fantasy_value=50", {'starting'}, FantasyValue(value_for_gameweek=50)),
         ]
         
-        self.roster_manager.players = players
-        self.roster_manager.sort_players_by_gameweek_status_and_fantasy_value()
+        self.roster[:] = players
+        self.roster.sort_players_by_gameweek_status_and_fantasy_value()
         
         # Should be sorted by value descending within the same status group
         expected_order = [
@@ -143,13 +112,13 @@ class TestFantraxRosterManagerSorting(unittest.TestCase):
             "status=starting, fantasy_value=50",
             "status=starting, fantasy_value=5",
         ]
-        actual_order = [player.name for player in self.roster_manager.players]
+        actual_order = [player.name for player in self.roster]
         
         self.assertEqual(actual_order, expected_order,
                         f"Expected order: {expected_order}, but got: {actual_order}")
         
         # Verify values are in descending order
-        values = [player.fantasy_value.value_for_gameweek for player in self.roster_manager.players]
+        values = [player.fantasy_value.value_for_gameweek for player in self.roster]
         self.assertEqual(values, [100, 50, 5], "Values should be in descending order")
     
     def test_sort_players_set_3_all_categories_with_ties(self):
@@ -166,8 +135,8 @@ class TestFantraxRosterManagerSorting(unittest.TestCase):
             self._create_mock_player("status=out, fantasy_value=20", {'out'}, FantasyValue(value_for_gameweek=20)),
         ]
         
-        self.roster_manager.players = players
-        self.roster_manager.sort_players_by_gameweek_status_and_fantasy_value()
+        self.roster[:] = players
+        self.roster.sort_players_by_gameweek_status_and_fantasy_value()
         
         expected_order = [
             "status=starting, fantasy_value=80",
@@ -179,7 +148,7 @@ class TestFantraxRosterManagerSorting(unittest.TestCase):
             "status=out, fantasy_value=25",
             "status=out, fantasy_value=20",
         ]
-        actual_order = [player.name for player in self.roster_manager.players]
+        actual_order = [player.name for player in self.roster]
         
         self.assertEqual(actual_order, expected_order,
                         f"Expected order: {expected_order}, but got: {actual_order}")
@@ -188,43 +157,43 @@ class TestFantraxRosterManagerSorting(unittest.TestCase):
         # First 3 should be starting/expected
         for i in range(3):
             self.assertTrue(
-                self.roster_manager.players[i].is_starting_in_gameweek or 
-                self.roster_manager.players[i].is_expected_to_play_in_gameweek,
+                self.roster[i].is_starting_in_gameweek or 
+                self.roster[i].is_expected_to_play_in_gameweek,
                 f"Player {i} should be starting or expected to play"
             )
         
         # Next 2 should be uncertain
         for i in range(3, 5):
             self.assertTrue(
-                self.roster_manager.players[i].is_uncertain_gametime_decision_in_gameweek,
+                self.roster[i].is_uncertain_gametime_decision_in_gameweek,
                 f"Player {i} should be uncertain"
             )
         
         # Last 3 should be benched/suspended/out
         for i in range(5, 8):
             self.assertTrue(
-                self.roster_manager.players[i].is_benched_or_suspended_or_out_in_gameweek,
+                self.roster[i].is_benched_or_suspended_or_out_in_gameweek,
                 f"Player {i} should be benched, suspended, or out"
             )
         
         # Verify descending order within each group
         starting_expected_values = [
             p.fantasy_value.value_for_gameweek 
-            for p in self.roster_manager.players[:3]
+            for p in self.roster[:3]
         ]
         self.assertEqual(starting_expected_values, [80, 75, 75],
                         "Starting/Expected group should be sorted descending")
         
         uncertain_values = [
             p.fantasy_value.value_for_gameweek 
-            for p in self.roster_manager.players[3:5]
+            for p in self.roster[3:5]
         ]
         self.assertEqual(uncertain_values, [50, 45],
                         "Uncertain group should be sorted descending")
         
         benched_out_values = [
             p.fantasy_value.value_for_gameweek 
-            for p in self.roster_manager.players[5:8]
+            for p in self.roster[5:8]
         ]
         self.assertEqual(benched_out_values, [30, 25, 20],
                         "Benched/Out group should be sorted descending")

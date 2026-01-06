@@ -1,0 +1,40 @@
+from fantrax_pl_team_manager.domain.constants import *
+
+# Position mapping constants
+POSITION_MAP_BY_ID = {
+    "704": POSITION_KEY_GOALKEEPER,
+    "703": POSITION_KEY_DEFENDER,
+    "702": POSITION_KEY_MIDFIELDER,
+    "701": POSITION_KEY_FORWARD,
+}
+
+POSITION_MAP_BY_SHORT_NAME = {v: k for k, v in POSITION_MAP_BY_ID.items()}
+
+# Status icon mapping constants
+STATUS_ICON_MAP_BY_ID = {
+    "12": "starting",
+    "34": "benched",
+    "15": "out",
+    "32": "expected-to-play",
+    "30": "out-for-next-game",
+    "1": "uncertain-gametime-decision",
+    "6": "suspended"
+}
+
+# Roster status constants
+ROSTER_STATUS_STARTER = "1"
+ROSTER_STATUS_RESERVE = "2"
+
+# Fantrax Premier League table header name constants
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_GAMES_PLAYED = "Games Played"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_WINS = "Wins"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_LOSSES = "Losses"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_TIES_OR_OVERTIME_LOSS = "Ties Or Overtime Losses"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_POINTS = "Points"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_GOALS_FOR = "Goals For"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_GOALS_AGAINST = "Goals Against"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_GOAL_DIFFERENCE = "Goal Difference"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_HOME_RECORD = "Home Record"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_AWAY_RECORD = "Away Record"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_LAST_TEN_RECORD = "Last Ten Record"
+FANTRAX_PREMIERE_LEAGUE_TABLE_HEADER_NAME_CURRENT_STREAK = "Current Streak"
