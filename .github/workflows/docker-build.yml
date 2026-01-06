@@ -75,7 +75,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
     outputs:
-      image_tag: ${{ steps.tag.outputs.image_tag }}
+      tag: ${{ steps.tag.outputs.tag }}
       is_tag: ${{ steps.tag.outputs.is_tag }}
 
   deploy-to-homelab:
@@ -85,6 +85,11 @@ jobs:
     steps:
       - name: Update homelab kustomization.yaml
         run: |
+          # Reconstruct image tag
+          REPO_NAME=${GITHUB_REPOSITORY#*/}
+          DOCKERHUB_USERNAME="zach17"
+          IMAGE_TAG="$DOCKERHUB_USERNAME/$REPO_NAME:${{ needs.docker-build.outputs.tag }}"
+          
           # Install kustomize
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash
           sudo mv kustomize /usr/local/bin/
@@ -99,11 +104,11 @@ jobs:
           
           # Update kustomization.yaml
           cd k8s/apps/fantrax-pl-team-manager
-          kustomize edit set image zach17/fantrax-pl-team-manager=${{ needs.docker-build.outputs.image_tag }}
+          kustomize edit set image zach17/fantrax-pl-team-manager=$IMAGE_TAG
           
           # Commit and push
           cd /tmp/homelab
           git add k8s/apps/fantrax-pl-team-manager/kustomization.yaml
-          git commit -m "Update fantrax-pl-team-manager image to ${{ needs.docker-build.outputs.image_tag }}"
+          git commit -m "Update fantrax-pl-team-manager image to $IMAGE_TAG"
           git push https://${{ secrets.HOMELAB_GITHUB_TOKEN }}@github.com/zbialik/homelab.git HEAD:main
 
