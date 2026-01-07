@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any, Dict, List, Set
 from decimal import Decimal, InvalidOperation
-
+from fantrax_pl_team_manager.domain.player_gameweek_stats import PlayerGameweekStats
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
 from fantrax_pl_team_manager.exceptions import FantraxException
 from fantrax_pl_team_manager.domain.constants import *
@@ -46,7 +46,7 @@ class FantraxPlayer:
         team_name:str = None, 
         icon_statuses: Set[str] = set(), 
         highlight_stats: Dict[str, Any] = {}, # TODO: change to PlayerHighlightStats
-        recent_gameweeks_stats: Dict[str, Any] = {}, # TODO: change to PlayerHighlightStats
+        gameweek_stats: List[PlayerGameweekStats] = [],
         upcoming_game_opponent: str = None, 
         upcoming_game_home_or_away: str = None, 
         premier_league_table: PremierLeagueTable = PremierLeagueTable()
@@ -56,7 +56,7 @@ class FantraxPlayer:
             self.team_name = team_name
             self.icon_statuses = icon_statuses
             self.highlight_stats = highlight_stats
-            self.recent_gameweeks_stats:Dict[str, Any] = recent_gameweeks_stats
+            self.gameweek_stats:List[PlayerGameweekStats] = gameweek_stats
             self.fantasy_value:FantasyValue = FantasyValue(value_for_gameweek=0, value_for_future_gameweeks=0)
             self.upcoming_game_opponent:str = upcoming_game_opponent
             self.upcoming_game_home_or_away:str = upcoming_game_home_or_away
@@ -113,7 +113,7 @@ class FantraxPlayer:
     def _update_fantasy_value_for_gameweek(self) -> None:
         """Update the fantasy value for the gameweek based on recent performance and upcoming match difficulty."""
         # Initialize fantasy value using recent gameweeks stats
-        fantasy_points = self.recent_gameweeks_stats.get('Fantasy Points', [])
+        fantasy_points = [gameweek_stat.points for gameweek_stat in self.gameweek_stats]
         if fantasy_points:
             avg_fantasy_points = sum(fantasy_points) / len(fantasy_points)
             self.fantasy_value.value_for_gameweek += avg_fantasy_points

@@ -3,7 +3,8 @@ from fantrax_pl_team_manager.domain.fantrax_player import FantraxPlayer, Fantasy
 from fantrax_pl_team_manager.domain.fantrax_roster import FantraxRoster
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
 from fantrax_pl_team_manager.integrations.fantrax.endpoints.players import get_player
-from fantrax_pl_team_manager.integrations.fantrax.endpoints.premier_league_table import get_premier_league_table
+from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_player_mapper import FantraxPlayerMapper
+from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_premier_league_table_mapper import FantraxPremierLeagueTableMapper
 from fantrax_pl_team_manager.integrations.fantrax.mappers.constants import *
 from fantrax_pl_team_manager.protocols import HttpClient, Mapper
 
@@ -11,7 +12,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_roster(http: HttpClient, roster_mapper: Mapper[FantraxRoster], premier_league_table_mapper: Mapper[PremierLeagueTable], player_mapper: Mapper[FantraxPlayer], league_id:str, team_id: str) -> FantraxRoster:
+def get_roster(http: HttpClient, roster_mapper: Mapper[FantraxRoster], premier_league_table_mapper: FantraxPremierLeagueTableMapper, player_mapper: FantraxPlayerMapper, league_id:str, team_id: str) -> FantraxRoster:
     """Get the roster info for a team.
     
     Parameters:
@@ -33,20 +34,7 @@ def get_roster(http: HttpClient, roster_mapper: Mapper[FantraxRoster], premier_l
     }
     
     obj = http.fantrax_request(payload, params={"leagueId": league_id})
-    roster:FantraxRoster = roster_mapper.from_json(obj)
-    premier_league_table:PremierLeagueTable = get_premier_league_table(http, premier_league_table_mapper)
-
-    for player in roster:
-        _player:FantraxPlayer = get_player(http, player_mapper, league_id, player.id)
-        player.name = _player.name
-        player.team_name = _player.team_name
-        player.icon_statuses = _player.icon_statuses
-        player.highlight_stats = _player.highlight_stats
-        player.recent_gameweeks_stats = _player.recent_gameweeks_stats
-        player.upcoming_game_opponent = _player.upcoming_game_opponent
-        player.upcoming_game_home_or_away = _player.upcoming_game_home_or_away
-        player.premier_league_table = premier_league_table
-        player._update_fantasy_value_for_gameweek()
+    roster:FantraxRoster = roster_mapper.from_json(obj, league_id, http, premier_league_table_mapper, player_mapper)
 
     return roster
 

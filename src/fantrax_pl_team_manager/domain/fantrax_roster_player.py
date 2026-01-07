@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import logging
 from typing import Any, Dict, List, Set
 from decimal import Decimal, InvalidOperation
+from fantrax_pl_team_manager.domain.player_gameweek_stats import PlayerGameweekStats
 
 from fantrax_pl_team_manager.domain.fantrax_player import FantraxPlayer
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
@@ -28,7 +29,7 @@ class FantraxRosterPlayer(FantraxPlayer):
         team_name:str = None, 
         icon_statuses: Set[str] = None, 
         highlight_stats: Dict[str, Any] = None, 
-        recent_gameweeks_stats: Dict[str, Any] = None,
+        gameweek_stats: List[PlayerGameweekStats] = [],
         upcoming_game_opponent: str = None, 
         upcoming_game_home_or_away: str = None, 
         premier_league_table: PremierLeagueTable = None,
@@ -40,7 +41,7 @@ class FantraxRosterPlayer(FantraxPlayer):
             self.rostered_position = rostered_position
             self.disable_lineup_change = disable_lineup_change
 
-            super().__init__(id, name, team_name, icon_statuses, highlight_stats, recent_gameweeks_stats, upcoming_game_opponent, upcoming_game_home_or_away, premier_league_table)
+            super().__init__(id, name, team_name, icon_statuses, highlight_stats, gameweek_stats, upcoming_game_opponent, upcoming_game_home_or_away, premier_league_table)
     
     def change_to_starter(self) -> None:
         """Change the player to a starter."""
