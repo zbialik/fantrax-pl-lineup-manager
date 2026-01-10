@@ -4,57 +4,57 @@ import math
 from dataclasses import dataclass
 import logging
 from typing import Any, Dict, List, Set, Optional, Callable, Tuple
-from decimal import Decimal, InvalidOperation
 
-from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
 from fantrax_pl_team_manager.exceptions import FantraxException
 from fantrax_pl_team_manager.domain.constants import *
 
-from fantrax_pl_team_manager.domain.fantrax_roster_player import FantraxRosterPlayer
+from fantrax_pl_team_manager.domain.fantasy_roster_player import FantasyRosterPlayer
+from fantrax_pl_team_manager.services.fantasy_value_calculator import calculate_fantasy_value_for_gameweek
+from fantrax_pl_team_manager.domain.booking_odds import BookingOddsHeadToHead
+from typing import List
 
 logger = logging.getLogger(__name__)
 
 
-class FantraxRoster(List[FantraxRosterPlayer]):
-    """A list of FantraxRosterPlayer objects with custom sorting capabilities.
+class FantasyRoster(List[FantasyRosterPlayer]):
+    """A list of FantasyRosterPlayer objects with custom sorting capabilities.
     
     This class extends Python's list to provide a custom sort() method
-    for sorting FantraxRosterPlayer objects.
+    for sorting FantasyRosterPlayer objects.
     """
     
-    def __init__(self, team_id: str, team_name: str, roster_limit_period: int, premier_league_table: PremierLeagueTable = None, iterable: Optional[List[FantraxRosterPlayer]] = []):
+    def __init__(self, team_id: str, team_name: str, roster_limit_period: int, iterable: Optional[List[FantasyRosterPlayer]] = []):
         self.team_id = team_id
         self.team_name = team_name
         self.roster_limit_period = roster_limit_period
-        self.premier_league_table:PremierLeagueTable = premier_league_table
         super().__init__(iterable)
     
     @property
-    def starters(self) -> List[FantraxRosterPlayer]:
+    def starters(self) -> List[FantasyRosterPlayer]:
         """Get all players currently in starting lineup.
         
         Returns:
-            List[FantraxRosterPlayer]: List of starting players
+            List[FantasyRosterPlayer]: List of starting players
         """
         return [player for player in self if player.rostered_starter]
     
     @property
-    def reserves(self) -> List[FantraxRosterPlayer]:
+    def reserves(self) -> List[FantasyRosterPlayer]:
         """Get all players currently on the bench.
         
         Returns:
-            List[FantraxRosterPlayer]: List of reserve players
+            List[FantasyRosterPlayer]: List of reserve players
         """
         return [player for player in self if not player.rostered_starter]
 
-    def get_roster_player(self, player_id:str) -> FantraxRosterPlayer:
+    def get_roster_player(self, player_id:str) -> FantasyRosterPlayer:
         """Get a player by their Fantrax ID."""
         for player in self:
             if player.id == player_id:
                 return player
         raise FantraxException(f"Player not found: {player_id}")
     
-    def sort(self, *, key: Optional[Callable[[FantraxRosterPlayer], Any]] = None, reverse: bool = False) -> None:
+    def sort(self, *, key: Optional[Callable[[FantasyRosterPlayer], Any]] = None, reverse: bool = False) -> None:
         """Sort the roster in place.
         
         Args:
@@ -68,7 +68,7 @@ class FantraxRoster(List[FantraxRosterPlayer]):
         else:
             super().sort(key=key, reverse=reverse)
  
-    def valid_substitutions(self, swap_players: List[FantraxRosterPlayer], disable_min_position_counts_check: bool = False) -> Tuple[bool, Optional[str]]:
+    def valid_substitutions(self, swap_players: List[FantasyRosterPlayer], disable_min_position_counts_check: bool = False) -> Tuple[bool, Optional[str]]:
         """Check if a list of substitutions is valid.
         
         Validates that the proposed substitutions would result in a valid lineup
@@ -139,11 +139,11 @@ class FantraxRoster(List[FantraxRosterPlayer]):
         
         return (True, None)
     
-    def get_starters_at_risk_not_playing_in_gameweek(self) -> List[FantraxRosterPlayer]:
+    def get_starters_at_risk_not_playing_in_gameweek(self) -> List[FantasyRosterPlayer]:
         """Get starters that are at risk of not playing in the gameweek.
         
         Returns:
-            List[FantraxRosterPlayer]: List of starters that are at risk of not playing in the gameweek (benched, suspended, out, or uncertain gametime decision)
+            List[FantasyRosterPlayer]: List of starters that are at risk of not playing in the gameweek (benched, suspended, out, or uncertain gametime decision)
         """
         out = []
         for player in self.starters:
@@ -151,24 +151,24 @@ class FantraxRoster(List[FantraxRosterPlayer]):
                 out.append(player)
         return out
 
-    def get_starters_by_position_short_name(self, position_short_name: str) -> List[FantraxRosterPlayer]:
+    def get_starters_by_position_short_name(self, position_short_name: str) -> List[FantasyRosterPlayer]:
         """Get starters by position short name.
         
         Parameters:
             position_short_name (str): Position short name
             
         Returns:
-            List[FantraxRosterPlayer]: List of starters by position short name
+            List[FantasyRosterPlayer]: List of starters by position short name
         """
         if position_short_name not in [POSITION_KEY_GOALKEEPER, POSITION_KEY_DEFENDER, POSITION_KEY_MIDFIELDER, POSITION_KEY_FORWARD]:
             raise FantraxException(f"Invalid position: {position_short_name}")
         return [player for player in self.starters if player.rostered_position == position_short_name]
     
-    def get_reserves_starting_or_expected_to_play(self) -> List[FantraxRosterPlayer]:
+    def get_reserves_starting_or_expected_to_play(self) -> List[FantasyRosterPlayer]:
         """Get reserves that are starting or expected to play.
         
         Returns:
-            List[FantraxRosterPlayer]: List of reserves that are expected to play
+            List[FantasyRosterPlayer]: List of reserves that are expected to play
         """
         out = []
         for player in self.reserves:
@@ -178,14 +178,14 @@ class FantraxRoster(List[FantraxRosterPlayer]):
 
     def sort_players_by_gameweek_status_and_fantasy_value(self):
         """Sort players by gameweek status and fantasy value for gameweek."""
-        logger.info(f"Current list of players prior to running sort operation: {[p.name for p in self]}")
+        logger.debug(f"Current list of players prior to running sort operation: {[p.name for p in self]}")
         # Organize roster into groups, each sorted by fantasy value for gameweek:
         # - starting or expected to play
         # - uncertain gametime decision
         # - benched, suspended, or out for this gameweek
-        _players_starting_or_expected_to_play:List[FantraxRosterPlayer] = []
-        _players_uncertain_gametime_decision:List[FantraxRosterPlayer] = []
-        _players_benched_suspended_or_out:List[FantraxRosterPlayer] = []
+        _players_starting_or_expected_to_play:List[FantasyRosterPlayer] = []
+        _players_uncertain_gametime_decision:List[FantasyRosterPlayer] = []
+        _players_benched_suspended_or_out:List[FantasyRosterPlayer] = []
         for player in self:
             if player.is_expected_to_play_in_gameweek or player.is_starting_in_gameweek:
                 _players_starting_or_expected_to_play.append(player)
@@ -215,32 +215,3 @@ class FantraxRoster(List[FantraxRosterPlayer]):
             out[position_short_name] = [player.name for player in self.get_starters_by_position_short_name(position_short_name)]
         return out
     
-    def optimize_lineup(self):
-        """Optimize the lineup for the current roster."""
-
-        logger.info(f"Starting optimize_lineup() for current roster")
-        
-        # Sort the players based on custom logic (gameweek status and fantasy value for gameweek)
-        self.sort_players_by_gameweek_status_and_fantasy_value()
-
-        # Reset all players as reserves unless they are locked from lineup changes
-        logger.info(f"Resetting all players as reserves unless they are locked from lineup changes")
-        for player in self:
-            if not player.disable_lineup_change:
-                player.change_to_reserve()
-        
-        # Iterate through players and promote to starter unless they are an invalid substitution
-        logger.info(f"Iterating through players to promote to starter unless they are an invalid substitution")
-        for player in self:
-            if player.disable_lineup_change:
-                logger.info(f"Player {player.name} is locked from lineup changes, skipping")
-            else:
-                vs = self.valid_substitutions([player], disable_min_position_counts_check=True)
-                if vs[0]:
-                    logger.info(f"Promoting {player.name} to starter")
-                    player.change_to_starter()
-                else:
-                    logger.info(f"Player {player.name} cannot be promoted to starter: {vs[1]}")
-        
-        logger.info(f"Starting lineup optimized to: ")
-        print(json.dumps(self.starting_lineup_by_position_short_name(), indent=2))

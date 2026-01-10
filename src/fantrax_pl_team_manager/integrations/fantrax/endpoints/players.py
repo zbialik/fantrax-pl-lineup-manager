@@ -1,7 +1,7 @@
-from fantrax_pl_team_manager.domain.fantrax_player import FantraxPlayer
-from fantrax_pl_team_manager.protocols import HttpClient, Mapper
+from fantrax_pl_team_manager.domain.fantasy_player import FantasyPlayer
+from fantrax_pl_team_manager.integrations.fantrax.protocols import HttpClient, Mapper
 
-def get_player(http: HttpClient, mapper: Mapper[FantraxPlayer], league_id: str, player_id: str) -> FantraxPlayer:
+def get_player(http: HttpClient, mapper: Mapper[FantasyPlayer], league_id: str, player_id: str) -> FantasyPlayer:
     """Get the player profile info for a player.
     
     Parameters:

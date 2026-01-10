@@ -197,7 +197,7 @@ Examples:
                             player_rows_data.append(row_item)
                 print(f"✅ Cookie file verified successfully!")
                 print(f"   Team ID: ({args.team_id})")
-                print(f"   FantraxPlayers found: {len(player_rows_data)}")
+                print(f"   FantasyPlayers found: {len(player_rows_data)}")
                 print(f"   Cookie file save to path:: {cookie_file}")
             except Exception as e:
                 print(f"❌ Unexpected error testing cookie: {e}")

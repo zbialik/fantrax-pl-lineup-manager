@@ -3,19 +3,17 @@ import inspect
 from dataclasses import dataclass
 import logging
 from typing import Any, Dict, List, Set
-from decimal import Decimal, InvalidOperation
 from fantrax_pl_team_manager.domain.player_gameweek_stats import PlayerGameweekStats
 
-from fantrax_pl_team_manager.domain.fantrax_player import FantraxPlayer
-from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
+from fantrax_pl_team_manager.domain.fantasy_player import FantasyPlayer
 from fantrax_pl_team_manager.domain.constants import *
 
 logger = logging.getLogger(__name__)
 
-class FantraxRosterPlayer(FantraxPlayer):
+class FantasyRosterPlayer(FantasyPlayer):
     """Represents a player on a Fantrax roster with roster-specific attributes.
     
-    Extends FantraxPlayer with roster-specific information like position and
+    Extends FantasyPlayer with roster-specific information like position and
     starting status within the team's roster.
     
     Attributes:
@@ -32,7 +30,6 @@ class FantraxRosterPlayer(FantraxPlayer):
         gameweek_stats: List[PlayerGameweekStats] = [],
         upcoming_game_opponent: str = None, 
         upcoming_game_home_or_away: str = None, 
-        premier_league_table: PremierLeagueTable = None,
         rostered_starter: bool = None,
         rostered_position:str = None, 
         disable_lineup_change:bool = False
@@ -41,7 +38,7 @@ class FantraxRosterPlayer(FantraxPlayer):
             self.rostered_position = rostered_position
             self.disable_lineup_change = disable_lineup_change
 
-            super().__init__(id, name, team_name, icon_statuses, highlight_stats, gameweek_stats, upcoming_game_opponent, upcoming_game_home_or_away, premier_league_table)
+            super().__init__(id, name, team_name, icon_statuses, highlight_stats, gameweek_stats, upcoming_game_opponent, upcoming_game_home_or_away)
     
     def change_to_starter(self) -> None:
         """Change the player to a starter."""

@@ -1,5 +1,5 @@
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
-from fantrax_pl_team_manager.protocols import HttpClient, Mapper
+from fantrax_pl_team_manager.integrations.fantrax.protocols import HttpClient, Mapper
 
 def get_premier_league_table(http: HttpClient, mapper: Mapper[PremierLeagueTable]) -> PremierLeagueTable:
     """Get the Premier League standings.

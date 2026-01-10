@@ -1,13 +1,5 @@
-import json
-import inspect
-import math
 from dataclasses import dataclass
 import logging
-from typing import Any, Dict, List, Set
-from decimal import Decimal, InvalidOperation
-from datetime import datetime
-from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
-from fantrax_pl_team_manager.exceptions import FantraxException
 from fantrax_pl_team_manager.domain.constants import *
 
 logger = logging.getLogger(__name__)
@@ -27,7 +19,7 @@ class PlayerGameweekStats:
     minutes_played: int = None
     goals: int = None
     assists: int = None
-    points: Decimal = None
+    points: float = None
     shots: int = None
     shots_on_target: int = None
     fouls_committed: int = None

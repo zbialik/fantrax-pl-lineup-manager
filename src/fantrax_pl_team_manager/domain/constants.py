@@ -1,3 +1,28 @@
+# TODO: Use these as keys for team name mapping in:
+#   [ ] integrations/the_odds_api/mappers/
+#   [ ] integrations/fantrax/mappers/
+EPL_TEAM_NAME_ARSENAL = "Arsenal"
+EPL_TEAM_NAME_ASTON_VILLA = "Aston Villa"
+EPL_TEAM_NAME_BOURNEMOUTH = "Bournemouth"
+EPL_TEAM_NAME_BRENTFORD = "Brentford"
+EPL_TEAM_NAME_BRIGHTON_AND_HOVE_ALBION = "Brighton and Hove Albion"
+EPL_TEAM_NAME_BURNLEY = "Burnley"
+EPL_TEAM_NAME_CHELSEA = "Chelsea"
+EPL_TEAM_NAME_CRYSTAL_PALACE = "Crystal Palace"
+EPL_TEAM_NAME_EVERTON = "Everton"
+EPL_TEAM_NAME_FULHAM = "Fulham"
+EPL_TEAM_NAME_LEEDS_UNITED = "Leeds United"
+EPL_TEAM_NAME_LIVERPOOL = "Liverpool"
+EPL_TEAM_NAME_MANCHESTER_CITY = "Manchester City"
+EPL_TEAM_NAME_MANCHESTER_UNITED = "Manchester United"
+EPL_TEAM_NAME_NEWCASTLE_UNITED = "Newcastle"
+EPL_TEAM_NAME_NOTTINGHAM_FOREST = "Nottingham"
+EPL_TEAM_NAME_SUNDERLAND = "Sunderland"
+EPL_TEAM_NAME_TOTTENHAM_HOTSPUR = "Tottenham"
+EPL_TEAM_NAME_WEST_HAM_UNITED = "West Ham"
+EPL_TEAM_NAME_WOLVERHAMPTON_WANDERERS = "Wolverhampton"
+
+
 POSITION_KEY_GOALKEEPER = "G"
 POSITION_KEY_DEFENDER = "D"
 POSITION_KEY_MIDFIELDER = "M"
@@ -22,7 +47,3 @@ STATUS_OUT_FOR_NEXT_GAME = "out-for-next-game"
 STATUS_STARTING = "starting"
 STATUS_EXPECTED_TO_PLAY = "expected-to-play"
 STATUS_UNCERTAIN_GAMETIME_DECISION = "uncertain-gametime-decision"
-
-# Fantasy value calculation constants
-DEFAULT_UPCOMING_GAME_COEFFICIENT_K = 0.7
-DEFAULT_UPCOMING_GAME_COEFFICIENT_A = 1

@@ -1,13 +1,11 @@
 import json
 import inspect
 import math
+from datetime import datetime
 from dataclasses import dataclass
 import logging
 from typing import Any, Dict, List, Set
-from decimal import Decimal, InvalidOperation
 from fantrax_pl_team_manager.domain.player_gameweek_stats import PlayerGameweekStats
-from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
-from fantrax_pl_team_manager.exceptions import FantraxException
 from fantrax_pl_team_manager.domain.constants import *
 
 logger = logging.getLogger(__name__)
@@ -20,24 +18,21 @@ class FantasyValue:
         value_for_gameweek: Fantasy value for the current gameweek
         value_for_future_gameweeks: Fantasy value for future gameweeks
     """
-    value_for_gameweek: int = 0
-    value_for_future_gameweeks: int = 0
+    value_for_gameweek: float = 0
+    value_for_future_gameweeks: float = 0
 
-class FantraxPlayer:
+class FantasyPlayer:
     """Represents a Fantrax player with their profile data and statistics.
     
     Attributes:
-        client: FantraxClient instance for API calls
         id: Player ID
         name: Player name
         team_name: Name of the player's Premier League team
         icon_statuses: Set of parsed icon statuses
         highlight_stats: Dictionary of highlight statistics
-        recent_gameweeks_stats: Dictionary of recent gameweek statistics
-        fantasy_value: Fantasy value for the player
+        gameweek_stats: List of gameweek statistics
         upcoming_game_opponent: Name of the opponent in the upcoming game
         upcoming_game_home_or_away: Whether the upcoming game is 'home' or 'away'
-        premier_league_table: Dictionary of Premier League team statistics
     """
 
     def __init__(self,
@@ -49,7 +44,7 @@ class FantraxPlayer:
         gameweek_stats: List[PlayerGameweekStats] = [],
         upcoming_game_opponent: str = None, 
         upcoming_game_home_or_away: str = None, 
-        premier_league_table: PremierLeagueTable = PremierLeagueTable()
+        upcoming_game_datetime: datetime = None,
         ):
             self.id = id
             self.name = name
@@ -57,11 +52,10 @@ class FantraxPlayer:
             self.icon_statuses = icon_statuses
             self.highlight_stats = highlight_stats
             self.gameweek_stats:List[PlayerGameweekStats] = gameweek_stats
-            self.fantasy_value:FantasyValue = FantasyValue(value_for_gameweek=0, value_for_future_gameweeks=0)
+            self.fantasy_value:FantasyValue = FantasyValue(value_for_gameweek=float(0.0), value_for_future_gameweeks=float(0.0))
             self.upcoming_game_opponent:str = upcoming_game_opponent
             self.upcoming_game_home_or_away:str = upcoming_game_home_or_away
-            self.premier_league_table:PremierLeagueTable = premier_league_table
-    
+            self.upcoming_game_datetime:datetime = upcoming_game_datetime
     @property
     def is_benched_or_suspended_or_out_in_gameweek(self) -> bool:
         """Check if player is benched, suspended, or out for the gameweek.
@@ -108,61 +102,6 @@ class FantraxPlayer:
             # If no statuses, assume they are expected to play
             return True
         return STATUS_EXPECTED_TO_PLAY in self.icon_statuses
-    
-
-    def _update_fantasy_value_for_gameweek(self) -> None:
-        """Update the fantasy value for the gameweek based on recent performance and upcoming match difficulty."""
-        # Initialize fantasy value using recent gameweeks stats
-        fantasy_points = [gameweek_stat.points for gameweek_stat in self.gameweek_stats]
-        if fantasy_points:
-            avg_fantasy_points = sum(fantasy_points) / len(fantasy_points)
-            self.fantasy_value.value_for_gameweek += avg_fantasy_points
-
-        # Update fantasy value based on difficulty of upcoming game
-        upcoming_game_coefficient = self._calculate_upcoming_game_coefficient()
-        self.fantasy_value.value_for_gameweek *= Decimal(upcoming_game_coefficient)
-    
-    def _calculate_upcoming_game_coefficient(
-        self,
-        k: float = DEFAULT_UPCOMING_GAME_COEFFICIENT_K,
-        a: int = DEFAULT_UPCOMING_GAME_COEFFICIENT_A) -> float:
-        """Calculate coefficient for upcoming game difficulty.
-        
-        Uses a hyperbolic tangent function to adjust fantasy value based on the
-        relative strength difference between the player's team and their opponent.
-        
-        Parameters:
-            k: Scaling factor for the coefficient (default: 0.7)
-            a: Scaling factor for rank difference (default: 1)
-            
-        Returns:
-            float: Coefficient multiplier for fantasy value
-            
-        Raises:
-            FantraxException: If team or opponent not found in Premier League stats
-        """
-        logger.debug(f"Calculating upcoming game coefficient for {self.team_name} vs {self.upcoming_game_opponent}")
-        
-        team = self.premier_league_table.get(self.team_name)
-        opponent = self.premier_league_table.get(self.upcoming_game_opponent)
-        
-        if team is None:
-            error_msg = f"Team {self.team_name} not found in Premier League team stats"
-            logger.error(error_msg)
-            raise FantraxException(error_msg)
-        
-        if opponent is None:
-            error_msg = f"Opponent {self.upcoming_game_opponent} not found in Premier League team stats"
-            logger.error(error_msg)
-            raise FantraxException(error_msg)
-        
-        team_rank = team.rank
-        opponent_rank = opponent.rank
-        total_teams = len(self.premier_league_table.keys())
-        
-        # Calculate coefficient using hyperbolic tangent function
-        coefficient = 1 + k * math.tanh(a * (team_rank - opponent_rank) / (total_teams - 1))
-        return coefficient
 
     def _to_dict(self) -> Dict[str, Any]:
         """Convert all attributes to a dictionary for JSON serialization.

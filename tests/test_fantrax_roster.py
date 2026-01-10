@@ -1,12 +1,12 @@
 from typing import Set
 import unittest
 from unittest.mock import Mock
-from fantrax_pl_team_manager.domain.fantrax_roster import FantraxRoster
-from fantrax_pl_team_manager.domain.fantrax_player import FantasyValue
-from fantrax_pl_team_manager.domain.fantrax_roster_player import FantraxRosterPlayer
+from fantrax_pl_team_manager.domain.fantasy_roster import FantasyRoster
+from fantrax_pl_team_manager.domain.fantasy_player import FantasyValue
+from fantrax_pl_team_manager.domain.fantasy_roster_player import FantasyRosterPlayer
 
 
-class TestFantraxRoster(unittest.TestCase):
+class TestFantasyRoster(unittest.TestCase):
     """Test cases for sort_players_by_gameweek_status_and_fantasy_value method."""
     
     def setUp(self):
@@ -16,7 +16,7 @@ class TestFantraxRoster(unittest.TestCase):
         self.roster_limit_period = 1
         
         # Create a roster instance (we'll override players)
-        self.roster = FantraxRoster(
+        self.roster = FantasyRoster(
             team_id=self.mock_team_id,
             team_name=self.mock_team_name,
             roster_limit_period=self.roster_limit_period
@@ -24,7 +24,7 @@ class TestFantraxRoster(unittest.TestCase):
     
     def _create_mock_player(self, name:str, icon_statuses:Set[str], fantasy_value:FantasyValue):
         """Helper method to create a mock player."""
-        player = Mock(spec=FantraxRosterPlayer)
+        player = Mock(spec=FantasyRosterPlayer)
         player.name = name
         player.fantasy_value = fantasy_value
         player.icon_statuses = icon_statuses
