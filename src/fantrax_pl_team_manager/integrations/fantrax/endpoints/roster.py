@@ -1,6 +1,7 @@
 import json
 from fantrax_pl_team_manager.domain.fantasy_roster import FantasyRoster
 from fantrax_pl_team_manager.integrations.fantrax.endpoints.players import get_player
+from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_player_gameweek_stats_mapper import FantraxPlayerGameweekStatsMapper
 from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_player_mapper import FantraxPlayerMapper
 from fantrax_pl_team_manager.integrations.fantrax.mappers.constants import *
 from fantrax_pl_team_manager.integrations.fantrax.protocols import HttpClient, Mapper
@@ -9,7 +10,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_roster(http: HttpClient, roster_mapper: Mapper[FantasyRoster], player_mapper: FantraxPlayerMapper, league_id:str, team_id: str) -> FantasyRoster:
+def get_roster(http: HttpClient, roster_mapper: Mapper[FantasyRoster], player_mapper: FantraxPlayerMapper, player_gameweek_stats_mapper: FantraxPlayerGameweekStatsMapper, league_id:str, team_id: str) -> FantasyRoster:
     """Get the roster info for a team.
     
     Parameters:
@@ -31,7 +32,7 @@ def get_roster(http: HttpClient, roster_mapper: Mapper[FantasyRoster], player_ma
     }
     
     obj = http.fantrax_request(payload, params={"leagueId": league_id})
-    roster:FantasyRoster = roster_mapper.from_json(obj, league_id, http, player_mapper)
+    roster:FantasyRoster = roster_mapper.from_json(obj, league_id, http, player_mapper, player_gameweek_stats_mapper)
 
     return roster
 

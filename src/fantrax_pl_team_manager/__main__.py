@@ -5,6 +5,7 @@ import logging
 from fantrax_pl_team_manager.domain.fantasy_roster import FantasyRoster
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
 from fantrax_pl_team_manager.integrations.fantrax.fantrax_http_client import FantraxRequestsHTTPClient
+from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_player_gameweek_stats_mapper import FantraxPlayerGameweekStatsMapper
 from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_player_mapper import FantraxPlayerMapper
 from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_roster_mapper import FantraxRosterMapper
 from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_premier_league_table_mapper import FantraxPremierLeagueTableMapper
@@ -36,6 +37,7 @@ async def main(
     fantrax_http_client: FantraxRequestsHTTPClient, 
     the_odds_api_http_client: TheOddsApiRequestsHTTPClient, 
     player_mapper: FantraxPlayerMapper, 
+    player_gameweek_stats_mapper: FantraxPlayerGameweekStatsMapper,
     roster_mapper: FantraxRosterMapper, 
     premier_league_table_mapper: FantraxPremierLeagueTableMapper, 
     odds_h2h_mapper: BookingOddsHeadToHeadMapper,
@@ -48,7 +50,7 @@ async def main(
     _running = True
     logger.info("Fantrax Premier League Team Manager running")
     
-    roster:FantasyRoster = get_roster(fantrax_http_client, roster_mapper, player_mapper, league_id, team_id)
+    roster:FantasyRoster = get_roster(fantrax_http_client, roster_mapper, player_mapper, player_gameweek_stats_mapper, league_id, team_id)
     odds_h2h_data: List[BookingOddsHeadToHead] = get_odds_h2h(the_odds_api_http_client, odds_h2h_mapper) # always refresh odds data on restart
     premier_league_table:PremierLeagueTable = get_premier_league_table(fantrax_http_client, premier_league_table_mapper)
     _roster_limit_period: int = roster.roster_limit_period
@@ -71,7 +73,7 @@ async def main(
             await asyncio.to_thread(optimize_lineup, roster, premier_league_table, odds_h2h_data)
             await asyncio.to_thread(update_roster, fantrax_http_client, league_id, team_id, roster)
             
-            roster = get_roster(fantrax_http_client, roster_mapper, player_mapper, league_id, team_id)
+            roster = get_roster(fantrax_http_client, roster_mapper, player_mapper, player_gameweek_stats_mapper, league_id, team_id)
             premier_league_table:PremierLeagueTable = get_premier_league_table(fantrax_http_client, premier_league_table_mapper)
         except Exception as e:
             logger.error(f"Error during lineup optimization: {e}", exc_info=True)
@@ -110,10 +112,11 @@ if __name__ == "__main__":
     the_odds_api_http_client = TheOddsApiRequestsHTTPClient(api_key=args.odds_api_key)
     player_mapper = FantraxPlayerMapper()
     roster_mapper = FantraxRosterMapper()
+    player_gameweek_stats_mapper = FantraxPlayerGameweekStatsMapper()
     premier_league_table_mapper = FantraxPremierLeagueTableMapper()
     odds_h2h_mapper = BookingOddsHeadToHeadMapper()
     try:
-        asyncio.run(main(fantrax_http_client, the_odds_api_http_client, player_mapper, roster_mapper, premier_league_table_mapper, odds_h2h_mapper, args.league_id, args.team_id, args.update_lineup_interval, run_once=args.run_once))
+        asyncio.run(main(fantrax_http_client, the_odds_api_http_client, player_mapper, player_gameweek_stats_mapper, roster_mapper, premier_league_table_mapper, odds_h2h_mapper, args.league_id, args.team_id, args.update_lineup_interval, run_once=args.run_once))
     except KeyboardInterrupt:
         print("\nShutting down gracefully...")
         sys.exit(0)

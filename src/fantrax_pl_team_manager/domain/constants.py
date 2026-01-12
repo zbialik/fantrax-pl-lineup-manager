@@ -37,7 +37,7 @@ MAX_GOALKEEPERS = 1
 MAX_DEFENDERS = 5
 MAX_MIDFIELDERS = 5
 MAX_FORWARDS = 3
-MAX_RECENT_GAMEWEEKS = 5
+# MAX_RECENT_GAMEWEEKS = 5 # TODO: Remove this if we conclude getting all gameweek stats is computationally ok
 
 # Status string constants
 STATUS_BENCHED = "benched"

@@ -1,8 +1,10 @@
 from typing import Any, Dict, Mapping, List
 from fantrax_pl_team_manager.domain.fantasy_roster import FantasyRoster
 from fantrax_pl_team_manager.domain.fantasy_roster_player import FantasyRosterPlayer
+from fantrax_pl_team_manager.domain.player_gameweek_stats import PlayerGameweekStats
 from fantrax_pl_team_manager.exceptions import FantraxException
 from fantrax_pl_team_manager.integrations.fantrax.endpoints.players import get_player
+from fantrax_pl_team_manager.integrations.fantrax.endpoints.players_gameweek_stats import get_player_gameweek_stats
 from fantrax_pl_team_manager.integrations.fantrax.mappers.constants import *
 from fantrax_pl_team_manager.integrations.fantrax.protocols import HttpClient, Mapper
 from fantrax_pl_team_manager.domain.fantasy_player import FantasyPlayer
@@ -12,16 +14,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 class FantraxRosterMapper:
-    def from_json(self, dto: Mapping[str, Any], league_id: str, http: HttpClient, player_mapper: Mapper[FantasyPlayer]) -> FantasyRoster:
+    def from_json(self, dto: Mapping[str, Any], league_id: str, http: HttpClient, player_mapper: Mapper[FantasyPlayer], player_gameweek_stats_mapper: Mapper[List[PlayerGameweekStats]]) -> FantasyRoster:
 
-        def _acquire_player_info(player:FantasyPlayer, league_id: str, http: HttpClient, player_mapper: Mapper[FantasyPlayer]) -> None:
+        def _acquire_player_info(player:FantasyPlayer, league_id: str, http: HttpClient, player_mapper: Mapper[FantasyPlayer], player_gameweek_stats_mapper: Mapper[List[PlayerGameweekStats]]) -> None:
             """Retrieve player information from Fantrax."""
             _player:FantasyPlayer = get_player(http, player_mapper, league_id, player.id)
             player.name = _player.name
             player.team_name = _player.team_name
             player.icon_statuses = _player.icon_statuses
             player.highlight_stats = _player.highlight_stats
-            player.gameweek_stats = _player.gameweek_stats
+            player.gameweek_stats:List[PlayerGameweekStats] = get_player_gameweek_stats(http, player_gameweek_stats_mapper, league_id, player.id)
             player.upcoming_game_opponent = _player.upcoming_game_opponent
             player.upcoming_game_home_or_away = _player.upcoming_game_home_or_away
         data = dto["responses"][0]["data"]
@@ -52,7 +54,7 @@ class FantraxRosterMapper:
                             rostered_position = POSITION_MAP_BY_ID.get(row_item['posId']), 
                             disable_lineup_change = row_item['scorer'].get("disableLineupChange",False)
                         )
-                        _acquire_player_info(player, league_id, http, player_mapper)
+                        _acquire_player_info(player, league_id, http, player_mapper, player_gameweek_stats_mapper)
                         roster.append(player)
         except Exception as e:
             logger.error(f"Error processing roster rows: {e}")
