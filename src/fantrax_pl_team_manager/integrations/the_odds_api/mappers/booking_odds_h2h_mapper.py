@@ -1,16 +1,16 @@
 from typing import Any, Dict, Mapping, List
 from statistics import median
-from fantrax_pl_team_manager.domain.booking_odds import BookingOddsHeadToHead
+from fantrax_pl_team_manager.domain.booking_odds import BookingOddsHeadToHead, BookingOddsHeadToHeadList
 from fantrax_pl_team_manager.integrations.the_odds_api.constants import BOOKING_ODDS_TEAM_NAME_MAP
 import logging
 
 logger = logging.getLogger(__name__)
 
 class BookingOddsHeadToHeadMapper:
-    def from_json(self, obj: Mapping[str, Any]) -> List[BookingOddsHeadToHead]:
+    def from_json(self, obj: Mapping[str, Any]) -> BookingOddsHeadToHeadList:
         data = obj
 
-        booking_odds_h2h_list: List[BookingOddsHeadToHead] = []
+        booking_odds_h2h_list: BookingOddsHeadToHeadList = BookingOddsHeadToHeadList()
 
         for event in data:
             _home_team = event['home_team']

@@ -17,10 +17,8 @@ class TheOddsApiRequestsHTTPClient:
         merged_params = params | {'api_key': self._api_key}
         # Make the request
         resp = requests.get(self._base_url + path, params=merged_params, headers=headers)
-        logger.info(f"Remaining API requests: {resp.headers['x-requests-remaining']}")
+        if 'x-requests-remaining' in resp.headers:
+            logger.info(f"Remaining API requests: {resp.headers['x-requests-remaining']}")
         resp.raise_for_status()
         out = resp.json()
-        # TODO: Remove this
-        with open('TEST_odds_h2h.json', 'w') as f:
-            json.dump(out, f, indent=2)
         return out

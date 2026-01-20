@@ -47,6 +47,11 @@ class FantasyRoster(List[FantasyRosterPlayer]):
         """
         return [player for player in self if not player.rostered_starter]
 
+    def print_player_names(self) -> None:
+        """Print the names of all players in the roster."""
+        for player in self:
+            print(player.name)
+    
     def get_roster_player(self, player_id:str) -> FantasyRosterPlayer:
         """Get a player by their Fantrax ID."""
         for player in self:

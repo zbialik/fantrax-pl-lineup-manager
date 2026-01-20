@@ -2,6 +2,8 @@ import sys
 import os
 import asyncio
 import logging
+import json
+from dataclasses import asdict
 from fantrax_pl_team_manager.domain.fantasy_roster import FantasyRoster
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
 from fantrax_pl_team_manager.integrations.fantrax.fantrax_http_client import FantraxRequestsHTTPClient
@@ -19,6 +21,7 @@ from fantrax_pl_team_manager.integrations.the_odds_api.the_odds_api_http_client 
 from typing import List
 import argparse
 from datetime import datetime, timedelta
+from fantrax_pl_team_manager.domain.utils import write_datatype_to_json
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +47,8 @@ async def main(
     league_id: str, 
     team_id: str, 
     update_lineup_interval: int, 
-    run_once: bool = False
+    run_once: bool = False,
+    persist_odds_data: bool = False
 ) -> None:
     """Run the roster manager."""
     _running = True
@@ -52,6 +56,8 @@ async def main(
     
     roster:FantasyRoster = get_roster(fantrax_http_client, roster_mapper, player_mapper, player_gameweek_stats_mapper, league_id, team_id)
     odds_h2h_data: List[BookingOddsHeadToHead] = get_odds_h2h(the_odds_api_http_client, odds_h2h_mapper) # always refresh odds data on restart
+    if persist_odds_data:
+        write_datatype_to_json(odds_h2h_data) # write odds data to disk
     premier_league_table:PremierLeagueTable = get_premier_league_table(fantrax_http_client, premier_league_table_mapper)
     _roster_limit_period: int = roster.roster_limit_period
 
@@ -67,6 +73,8 @@ async def main(
             if premier_league_match_within_time_window(roster, update_lineup_interval):
                 logger.info(f"An upcoming match is within time window to refresh booking odds data, doing so now...")
                 odds_h2h_data: List[BookingOddsHeadToHead] = get_odds_h2h(the_odds_api_http_client, odds_h2h_mapper)
+                if persist_odds_data:
+                    write_datatype_to_json(odds_h2h_data)
             else:
                 logger.info(f"No upcoming match is within time window to refresh booking odds data, skipping...")
             
@@ -88,6 +96,7 @@ if __name__ == "__main__":
     parser.add_argument("--odds-api-key", type=str, default=os.getenv('THE_ODDS_API_KEY'), required=False)
     parser.add_argument("--update-lineup-interval", type=int, default=600, required=False)
     parser.add_argument("--run-once", action="store_true", default=False, required=False)
+    parser.add_argument("--persist-odds-data", action="store_true", default=False, required=False)
     parser.add_argument("--log-level", type=str, default="info", required=False)
     args = parser.parse_args()
 
@@ -116,7 +125,7 @@ if __name__ == "__main__":
     premier_league_table_mapper = FantraxPremierLeagueTableMapper()
     odds_h2h_mapper = BookingOddsHeadToHeadMapper()
     try:
-        asyncio.run(main(fantrax_http_client, the_odds_api_http_client, player_mapper, player_gameweek_stats_mapper, roster_mapper, premier_league_table_mapper, odds_h2h_mapper, args.league_id, args.team_id, args.update_lineup_interval, run_once=args.run_once))
+        asyncio.run(main(fantrax_http_client, the_odds_api_http_client, player_mapper, player_gameweek_stats_mapper, roster_mapper, premier_league_table_mapper, odds_h2h_mapper, args.league_id, args.team_id, args.update_lineup_interval, run_once=args.run_once, persist_odds_data=args.persist_odds_data))
     except KeyboardInterrupt:
         print("\nShutting down gracefully...")
         sys.exit(0)

@@ -10,7 +10,15 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-def get_roster(http: HttpClient, roster_mapper: Mapper[FantasyRoster], player_mapper: FantraxPlayerMapper, player_gameweek_stats_mapper: FantraxPlayerGameweekStatsMapper, league_id:str, team_id: str) -> FantasyRoster:
+def get_roster(
+    http: HttpClient, 
+    roster_mapper: Mapper[FantasyRoster], 
+    player_mapper: FantraxPlayerMapper, 
+    player_gameweek_stats_mapper: FantraxPlayerGameweekStatsMapper, 
+    league_id:str, 
+    team_id: str,
+    period: int = None, # defines gameweek (starts at 1)
+    ) -> FantasyRoster:
     """Get the roster info for a team.
     
     Parameters:
@@ -25,7 +33,8 @@ def get_roster(http: HttpClient, roster_mapper: Mapper[FantasyRoster], player_ma
                 'method': 'getTeamRosterInfo', 
                 'data': {
                     'leagueId': league_id, 
-                    'teamId': team_id
+                    'teamId': team_id,
+                    'period': str(period) if period else None
                 }
             }
         ]

@@ -4,13 +4,14 @@ from typing import List, Optional
 from fantrax_pl_team_manager.domain.booking_odds import BookingOddsHeadToHead
 from fantrax_pl_team_manager.domain.constants import *
 from fantrax_pl_team_manager.domain.fantasy_player import FantasyPlayer
+from fantrax_pl_team_manager.domain.player_gameweek_stats import PlayerGameweekStats
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
 from fantrax_pl_team_manager.exceptions import FantraxException
 import math
 
 logger = logging.getLogger(__name__)
 
-def calculate_fantasy_value_for_gameweek(player: FantasyPlayer, premier_league_table: PremierLeagueTable, odds_h2h_data_for_upcoming_game: Optional[BookingOddsHeadToHead]) -> float:
+def calculate_fantasy_value_for_gameweek(player: FantasyPlayer, player_gameweek_stats: List[PlayerGameweekStats], premier_league_table: PremierLeagueTable, odds_h2h_data_for_upcoming_game: Optional[BookingOddsHeadToHead]) -> float:
     """Calculate the fantasy value of a player.
     
     Args:
@@ -24,7 +25,7 @@ def calculate_fantasy_value_for_gameweek(player: FantasyPlayer, premier_league_t
     fantasy_value_for_gameweek: float = 0.0
     
     # Initialize fantasy value using recent gameweeks stats
-    fantasy_points = [gameweek_stat.points for gameweek_stat in player.gameweek_stats]
+    fantasy_points = [gameweek_stat.points for gameweek_stat in player_gameweek_stats]
     if fantasy_points:
         avg_fantasy_points = sum(fantasy_points) / len(fantasy_points)
         fantasy_value_for_gameweek += avg_fantasy_points

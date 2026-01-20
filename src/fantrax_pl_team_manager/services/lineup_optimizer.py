@@ -22,7 +22,7 @@ def optimize_lineup(roster: FantasyRoster, premier_league_table: PremierLeagueTa
                 if (o.home_team == player.upcoming_game_opponent and o.away_team == player.team_name) or (o.away_team == player.upcoming_game_opponent and o.home_team == player.team_name):
                     odds_h2h_data_for_upcoming_game = o
                     break
-        fantasy_value_for_gameweek = calculate_fantasy_value_for_gameweek(player, premier_league_table, odds_h2h_data_for_upcoming_game)
+        fantasy_value_for_gameweek = calculate_fantasy_value_for_gameweek(player, player.gameweek_stats, premier_league_table, odds_h2h_data_for_upcoming_game)
         player.fantasy_value.value_for_gameweek = fantasy_value_for_gameweek
     
     # Sort the players by gameweek status and fantasy value for gameweek
