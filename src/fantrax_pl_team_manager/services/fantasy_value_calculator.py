@@ -32,11 +32,11 @@ def calculate_fantasy_value_for_gameweek(player: FantasyPlayer, player_gameweek_
 
     # Update fantasy value based on booking odds
     if odds_h2h_data_for_upcoming_game:
-        logger.info(f"Head-to-head booking odds data available for {player.team_name} vs {player.upcoming_game_opponent}, using for fixture difficulty coefficient")
+        logger.info(f"H2H booking odds data available for {player.team_name} vs {player.upcoming_game_opponent}, using for fixture difficulty coefficient")
         booking_odds_coefficient = _calc_fixture_difficulty_coefficient_with_booking_odds(player, odds_h2h_data_for_upcoming_game)
         fantasy_value_for_gameweek *= float(booking_odds_coefficient)
     else:
-        logger.info(f"No head-to-head booking odds data available for {player.team_name} vs {player.upcoming_game_opponent}, using league standings for fixture difficulty coefficient")
+        logger.info(f"No H2H booking odds data available for {player.team_name} vs {player.upcoming_game_opponent}, using league standings for fixture difficulty coefficient")
         # Update fantasy value based on difficulty of upcoming game
         upcoming_game_coefficient = _calc_fixture_difficulty_coefficient_with_league_standings(player, premier_league_table)
         fantasy_value_for_gameweek *= float(upcoming_game_coefficient)

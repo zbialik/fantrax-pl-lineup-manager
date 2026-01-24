@@ -26,6 +26,7 @@ class FantraxRosterMapper:
             player.gameweek_stats:List[PlayerGameweekStats] = get_player_gameweek_stats(http, player_gameweek_stats_mapper, league_id, player.id)
             player.upcoming_game_opponent = _player.upcoming_game_opponent
             player.upcoming_game_home_or_away = _player.upcoming_game_home_or_away
+            player.upcoming_game_datetime = _player.upcoming_game_datetime
         data = dto["responses"][0]["data"]
         team_id = data.get("myTeamIds")[0]
         logger.debug(f"Mapped Team ID: {str(team_id)}")
