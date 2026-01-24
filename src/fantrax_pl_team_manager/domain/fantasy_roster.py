@@ -192,12 +192,12 @@ class FantasyRoster(List[FantasyRosterPlayer]):
         _players_uncertain_gametime_decision:List[FantasyRosterPlayer] = []
         _players_benched_suspended_or_out:List[FantasyRosterPlayer] = []
         for player in self:
-            if player.is_expected_to_play_in_gameweek or player.is_starting_in_gameweek:
-                _players_starting_or_expected_to_play.append(player)
-            elif player.is_uncertain_gametime_decision_in_gameweek:
+            if player.is_uncertain_gametime_decision_in_gameweek:
                 _players_uncertain_gametime_decision.append(player)
             elif player.is_benched_or_suspended_or_out_in_gameweek:
                 _players_benched_suspended_or_out.append(player)
+            elif player.is_expected_to_play_in_gameweek or player.is_starting_in_gameweek:
+                _players_starting_or_expected_to_play.append(player)
             else:
                 logger.error(f"Player {player.name} has an unaccounted for status. (Icon statuses: {player.icon_statuses})")
                 _players_benched_suspended_or_out.append(player)

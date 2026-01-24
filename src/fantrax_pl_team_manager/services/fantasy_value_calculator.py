@@ -29,6 +29,9 @@ def calculate_fantasy_value_for_gameweek(player: FantasyPlayer, player_gameweek_
     if fantasy_points:
         avg_fantasy_points = sum(fantasy_points) / len(fantasy_points)
         fantasy_value_for_gameweek += avg_fantasy_points
+        logger.info(f"Initializing {player.name} fantasy value from average of fantasy points earned in last {len(fantasy_points)} gameweeks: {fantasy_value_for_gameweek}")
+    else:
+        logger.info(f"No fantasy points data available for {player.name}, initializing fantasy value to 0")
 
     # Update fantasy value based on booking odds
     if odds_h2h_data_for_upcoming_game:
