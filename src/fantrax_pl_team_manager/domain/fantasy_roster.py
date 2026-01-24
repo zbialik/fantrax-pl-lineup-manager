@@ -220,3 +220,20 @@ class FantasyRoster(List[FantasyRosterPlayer]):
             out[position_short_name] = [player.name for player in self.get_starters_by_position_short_name(position_short_name)]
         return out
     
+    def get_matches_for_this_gameweek(self) -> Set[List[str]]:
+        """
+        Get the matches for this gameweek.
+        
+        A match is a list of two teams, the first team is the home team and the second team is the away team.
+        
+        Returns:
+            Set[List[str]]: Set of matches for this gameweek
+        """
+        out = set[tuple[str, str]]()
+        for player in self:
+            if not player.disable_lineup_change:
+                if player.upcoming_game_home_or_away == 'home':
+                    out.add(tuple([player.team_name, player.upcoming_game_opponent]))
+                else:
+                    out.add(tuple([player.upcoming_game_opponent, player.team_name]))
+        return out

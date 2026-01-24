@@ -4,6 +4,7 @@ import asyncio
 import logging
 import json
 from dataclasses import asdict
+from fantrax_pl_team_manager.domain.booking_odds_event_player_goal_scorer_anytime import BookingOddsEventPlayerGoalScorerAnytimeList
 from fantrax_pl_team_manager.domain.fantasy_roster import FantasyRoster
 from fantrax_pl_team_manager.domain.premier_league_table import PremierLeagueTable
 from fantrax_pl_team_manager.integrations.fantrax.fantrax_http_client import FantraxRequestsHTTPClient
@@ -13,10 +14,12 @@ from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_roster_mapper 
 from fantrax_pl_team_manager.integrations.fantrax.mappers.fantrax_premier_league_table_mapper import FantraxPremierLeagueTableMapper
 from fantrax_pl_team_manager.integrations.fantrax.endpoints.roster import get_roster, update_roster
 from fantrax_pl_team_manager.integrations.fantrax.endpoints.premier_league_table import get_premier_league_table
+from fantrax_pl_team_manager.integrations.the_odds_api.endpoints.odds_events_player_goal_scorer_anytime import  get_odds_events_player_goal_scorer_anytime
+from fantrax_pl_team_manager.integrations.the_odds_api.mappers.booking_odds_event_player_goal_scorer_anytime import BookingOddsEventPlayerGoalScorerAnytimeMapper
 from fantrax_pl_team_manager.services.lineup_optimizer import optimize_lineup
 from fantrax_pl_team_manager.integrations.the_odds_api.endpoints.odds_h2h import get_odds_h2h
 from fantrax_pl_team_manager.integrations.the_odds_api.mappers.booking_odds_h2h_mapper import BookingOddsHeadToHeadMapper
-from fantrax_pl_team_manager.domain.booking_odds import BookingOddsHeadToHead
+from fantrax_pl_team_manager.domain.booking_odds import BookingOddsHeadToHead, BookingOddsHeadToHeadList
 from fantrax_pl_team_manager.integrations.the_odds_api.the_odds_api_http_client import TheOddsApiRequestsHTTPClient
 from typing import List
 import argparse
@@ -46,6 +49,7 @@ async def main(
     roster_mapper: FantraxRosterMapper, 
     premier_league_table_mapper: FantraxPremierLeagueTableMapper, 
     odds_h2h_mapper: BookingOddsHeadToHeadMapper,
+    odds_event_player_goal_scorer_anytime_mapper: BookingOddsEventPlayerGoalScorerAnytimeMapper,
     league_id: str, 
     team_id: str, 
     update_lineup_interval: int, 
@@ -57,9 +61,11 @@ async def main(
     logger.info("Fantrax Premier League Team Manager running")
     
     roster:FantasyRoster = get_roster(fantrax_http_client, roster_mapper, player_mapper, player_gameweek_stats_mapper, league_id, team_id)
-    odds_h2h_data: List[BookingOddsHeadToHead] = get_odds_h2h(the_odds_api_http_client, odds_h2h_mapper) # always refresh odds data on restart
+    odds_h2h_data: BookingOddsHeadToHeadList = get_odds_h2h(the_odds_api_http_client, odds_h2h_mapper) # always refresh odds data on restart
+    odds_event_player_goal_scorer_anytime_data: BookingOddsEventPlayerGoalScorerAnytimeList = get_odds_events_player_goal_scorer_anytime(the_odds_api_http_client, odds_event_player_goal_scorer_anytime_mapper, roster.get_matches_for_this_gameweek())
     if persist_odds_data:
-        write_datatype_to_json(odds_h2h_data) # write odds data to disk
+        write_datatype_to_json(odds_h2h_data) # write odds h2h data to disk
+        write_datatype_to_json(odds_event_player_goal_scorer_anytime_data) # write odds event player goal scorer anytime data to disk
     premier_league_table:PremierLeagueTable = get_premier_league_table(fantrax_http_client, premier_league_table_mapper)
     
     if run_once:
@@ -74,8 +80,10 @@ async def main(
             if premier_league_match_within_time_window(roster, update_lineup_interval):
                 logger.info(f"An upcoming match is within time window to refresh booking odds data, doing so now...")
                 odds_h2h_data: List[BookingOddsHeadToHead] = get_odds_h2h(the_odds_api_http_client, odds_h2h_mapper)
+                odds_event_player_goal_scorer_anytime_data: BookingOddsEventPlayerGoalScorerAnytimeList = get_odds_events_player_goal_scorer_anytime(the_odds_api_http_client, odds_event_player_goal_scorer_anytime_mapper, roster.get_matches_for_this_gameweek())
                 if persist_odds_data:
-                    write_datatype_to_json(odds_h2h_data)
+                    write_datatype_to_json(odds_h2h_data) # write odds h2h data to disk
+                    write_datatype_to_json(odds_event_player_goal_scorer_anytime_data) # write odds event player goal scorer anytime data to disk
             else:
                 logger.info(f"No upcoming match is within time window to refresh booking odds data, skipping...")
             
@@ -125,8 +133,9 @@ if __name__ == "__main__":
     player_gameweek_stats_mapper = FantraxPlayerGameweekStatsMapper()
     premier_league_table_mapper = FantraxPremierLeagueTableMapper()
     odds_h2h_mapper = BookingOddsHeadToHeadMapper()
+    odds_event_player_goal_scorer_anytime_mapper = BookingOddsEventPlayerGoalScorerAnytimeMapper()
     try:
-        asyncio.run(main(fantrax_http_client, the_odds_api_http_client, player_mapper, player_gameweek_stats_mapper, roster_mapper, premier_league_table_mapper, odds_h2h_mapper, args.league_id, args.team_id, args.update_lineup_interval, run_once=args.run_once, persist_odds_data=args.persist_odds_data))
+        asyncio.run(main(fantrax_http_client, the_odds_api_http_client, player_mapper, player_gameweek_stats_mapper, roster_mapper, premier_league_table_mapper, odds_h2h_mapper, odds_event_player_goal_scorer_anytime_mapper, args.league_id, args.team_id, args.update_lineup_interval, run_once=args.run_once, persist_odds_data=args.persist_odds_data))
     except KeyboardInterrupt:
         print("\nShutting down gracefully...")
         sys.exit(0)
