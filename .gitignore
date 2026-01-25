@@ -7,3 +7,4 @@ test.py
 tmp
 old
 *.json
+logs.txt

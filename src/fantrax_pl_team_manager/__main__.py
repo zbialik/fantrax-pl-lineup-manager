@@ -25,21 +25,9 @@ from typing import List
 import argparse
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
-from fantrax_pl_team_manager.domain.utils import write_datatype_to_json
+from fantrax_pl_team_manager.domain.utils import write_datatype_to_json, premier_league_match_within_time_window
 
 logger = logging.getLogger(__name__)
-
-def premier_league_match_within_time_window(roster:FantasyRoster, update_lineup_interval: int) -> bool:
-    """Check if the premier league match is within the time window."""
-    for p in roster:
-        logger.debug(f"{p.name} has upcoming game datetime: {p.upcoming_game_datetime}")
-        if p.upcoming_game_datetime is not None and (
-            # Match is within 1 hour of start time
-            datetime.now(ZoneInfo("America/Los_Angeles")).replace(tzinfo=None) + timedelta(hours=1) > p.upcoming_game_datetime) and (
-            # Update lineup interval has not passed
-            datetime.now(ZoneInfo("America/Los_Angeles")).replace(tzinfo=None) + timedelta(hours=1) - p.upcoming_game_datetime <= timedelta(seconds=update_lineup_interval)):
-            return True
-    return False
 
 async def main(
     fantrax_http_client: FantraxRequestsHTTPClient, 
